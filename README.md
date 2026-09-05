@@ -19,3 +19,11 @@ Datasets origins*:
 
 *This information is also located alongside the datasets under "DataSources.txt" - possibly remove both this + the .txt file later.
 
+# Edit readme later
+
+To Use python Files:
+
+Will need to run python install commands for packages listed before code next to 'import X' (all simple) if you don't have them installed already:
+folium, pandas, matplotlib, requests, probably one or two more but can't remember which are main packages and which come with those main packages, just run the install command for the name of the package and see what it says I guess. 
+
+can use 'pip install (package name)' if you have 'pip' configured / installed, otherwise need to configure / install pip first 
