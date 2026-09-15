@@ -5,4 +5,19 @@
 "BOM-Datasets" - Provided by supervisor, but can and likely will be updated by location from the source at the BOM website: https://www.bom.gov.au/climate/data/ 
 
 
+Note: Current "BOM-Datasets" data is actually from Perth Airport (M.O) - Station num 9021, opened 1944, still open, Lat 31.93 deg S, Lon 115.98 deg E, 15m Elevation
+- Source & Maybe replace this data, or move inside a folder by state (e.g. Perth\(the datasets in csv + associated .txt files))
 
+Closest Ti-Tree available data = 015643 Territory Grape Farm NT (42.0km away) - Maybe use this for now as we focus on Ti-Tree area. Test with existing Perth data first I guess.
+
+Error in Line 930 of Bores.csv - an exta " is in the line ("MCMAHONS 6"CAS 72K E OF 3/WAYS) meaning a , is assumed as end of data so 19 cols instead of 18.
+
+"pandas.errors.ParserError: Error tokenizing data. C error: Expected 18 fields in line 930, saw 19"
+
+Multiple occurrances though so need to change how the csv is read
+
+Strip the CSV of the "", pandas dataframe ends up as this so the errors begin at looking for "Bore no" instead of -> Bore no
+
+['"Bore no"', '"Name"', '"Bore report"', '"Yield (L/s)"', '"Completion date"', '"Drilled depth (m)"', '"Completion depth (m)"', '"Depth to water (m) at date of drilling"', '"Purpose"', '"Construction"', '"Status"', '"Latitude"', '"Longitude"', '"UTM zone"', '"Easting"', '"Northing"', '"Position accuracy"', '"Water data portal"']
+
+# Note - Maybe remove this file in future, move info to readme?

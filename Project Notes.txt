@@ -1,0 +1,101 @@
+=========================
+04/09/2026
+=========================
+# General Project Notes
+# - Focus on Ti Tree Basin for now.
+# - Cross reference bore data identifiers (e.g. RN005626) with the bore data list / other CSVs? 
+#       - End goal might be being able to automatically download up to date data, save it in the CSV index used here with all necessary features?
+#       - Much like the solution already in place, 
+#       - Work out how to automatically retrieve data from source (maybe through the direct link for location, might need a CSV of location names + the 'download CSV' link so the user can get it easily?)
+# - Incorporate BOM rainfall and NTG bore data, focusing on Ti Tree Basin first.
+# - Analyse data first - e.g. a graph of bore data vs bore level is the same graph so no point comparing the two. - See 
+
+# Tasks Advised
+# 1 - "It would be good if they can automatically extract this data for the region of interest, that is a good idea."
+# 2 - "From this data I have asked the to consider seasonal changes like you do for rainfall, they could do that for bore data matched to local rainfall? To consider replenishment."
+# 3 - "I have suggested that they improve on the NTG bore map and enable users to click a location on a terrain map to add a bore reading to a single graph for comparison."
+
+# Think about:
+# What are the best types of data to compare / contrast
+# What information would this give us, and how might it be relevant for a groundwater report card
+# What does a groundwater report card generally look like
+
+
+# Folium-Test.py Notes
+# Maybe add something like a GUI prompt for the user to filter location for data? Idk might be too complex atm
+# Could use a GUI for the data comparison tool, like 'choose first location + type of data (field / publish)', then 'choose second location + type'
+# - then generate a twin-plot (both data sets on the one graph) showing how both compare? Might need to work out how to get opposing data sets to look 
+# like a valuable comparison and not a jumbled mess / unintelligible graph first though
+
+# New Notes
+# Would having to open the generated html file to view the map be too much? I think Tkinter is an all-in-one 'run code' solution, but from what I read it
+# didn't have some of the features that folium has, so not sure yet which would be better.
+
+
+10/09/26
+
+General Notes
+# Ti Tree Basin area has been implemented in the "Folium_Bore_Implementation.py" file.
+# - It incorporates the available data CSVs we have at the moment, links them using Bore_ID (setting "Bore No" from Bores.csv to Bore_ID to make this work),
+#   and generates plots that are embedded within the markers placed at their exact Latitude and Longitude extracted from the CSVs, on the interactive Folium map.
+# 
+# - Currently, the program only finds the first available CSV (which ends up being Depth Below Ground), or it finds this one last and overwrites the previous data (Water Elevation)
+    resulting in only DBG being displayed - not sure which yet. 
+    
+    I've used 'rglob' instead of the regular 'glob' function for recursivity, as the data CSVs are located under LocationExport subfolders
+    in the GroundwaterHeads_20250718 folder, but haven't worked out how to fix this problem at the moment.
+
+# - Markers are all the same colour as well - perhaps I could work out how to separate them into type (like the filters change colours on the NTG AI website)
+#   but not sure yet.
+
+Things to Add in next version
+# Add a feature to select what type of data the user wants to search for, start with terminal user input prompt like "Select a data type - 1) DBG, 2) Water Elevation, 3) etc"
+# The BOM + NT ResourceMap data has been included already, but bom data is for Perth Airport and it doesn't match the other data in the query by bore ID so has been left out
+# - Sub in the downloaded NT region data, nearest available is "015643 Territory Grape Farm NT (42.0km away)". 
+
+# Add a feature that downloads the latest available data, maybe an automated check for data when the script is run and if yes, prompt the user to download
+    - Could let user ignore download and view current too, but maybe automated forced update is best?
+Things to find out
+# Are we planning on expanding beyond Ti Tree (might be too ambitious, see how we go I guess before we even address this), thus making sense to incorporate other data sources?
+# Maybe could work out how to add other state data, maybe with a region selector (building upon the data type selector, shouldn't be too different maybe?)
+
+# If we're essentially replicating the existing site using their data, what should we be adding / changing to make it different and worth using?
+
+# some more notes to be added here but can't think of any atm.
+
+
+* Copied from main project file *
+
+# Data in Bores.csv (under NT Gov Res Maps) includes things like Purpose, Status, etc - should this be incorporated into the plot on each marker as relevant information?
+
+
+
+# There's 5025 BoreIDs in Ti Tree (when running the Folium_Bore_Implementation_Test.py code file), but only 16 of them are passed - it found 16 common between groundwater + BoreIDs so must just stop there.
+# We don't have any data that isn't Ti Tree from groundwater folder though so makes sense
+
+# It's only using the range for Lat between (-23, -19) &
+    bores["Longitude"].between(131, 136), anything outside of this gets passed off. 
+    
+    Look particularly at "bores_ti_tree = bores[ti_tree_area].copy()", go through ti_tree_area path and bores_ti_tree path too
+    Perhaps I messed up somewhere and it's only counting 
+    
+    but the only data we have matches that range, is there actually 5025 in Ti Tree or is there a problem with the (between -23, -19 & 131, 136) 
+    - investigate. 
+
+    Actually I could just take all the data exclusively from Bores_Ti_tree.csv... unfortunately didn't see that until now but that's alright.
+
+
+    # Can scrape daily data from BOM's site, each station follows the same URL
+    https://www.bom.gov.au/jsp/ncc/cdio/weatherData/av?p_nccObsCode=136&p_display_type=dailyDataFile&p_startYear=&p_c=&p_stn_num=010558
+
+    With only the end bit 6 numbers changing, e.g. "&p_stn_num=010558" and "&p_stn_num=009021".
+
+    Download is a direct link, e.g. for "All Years" of Perth Airport = 
+    https://www.bom.gov.au/jsp/ncc/cdio/weatherData/av?p_display_type=dailyZippedDataFile&p_stn_num=009021&p_c=-16391791&p_nccObsCode=136&p_startYear=2026
+
+    For "All Years" of Gnowangerup:
+    https://www.bom.gov.au/jsp/ncc/cdio/weatherData/av?p_display_type=dailyZippedDataFile&p_stn_num=010558&p_c=-22410375&p_nccObsCode=136&p_startYear=2024
+
+    Only changes onward from &p_stn_num=010558, work out how to automate this download + extraction with updating of CSVs in folder.
+
+

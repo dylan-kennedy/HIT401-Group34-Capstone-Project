@@ -1,41 +1,16 @@
 #####
 #
 #   HIT401 - Group 34
-#   "Folium Test (folium-test.py)"
-#   see description below
+#   Main Project Code Script
+#   
+#   Dylan Kennedy, Gaurab Gaihre, Krishna Dhakal, Sachin Kharel.
 #   
 #####
 
-# General Project Notes
-# - Focus on Ti Tree Basin for now.
-# - Cross reference bore data identifiers (e.g. RN005626) with the bore data list / other CSVs? 
-#       - End goal might be being able to automatically download up to date data, save it in the CSV index used here with all necessary features?
-#       - Much like the solution already in place, 
-#       - Work out how to automatically retrieve data from source (maybe through the direct link for location, might need a CSV of location names + the 'download CSV' link so the user can get it easily?)
-# - Incorporate BOM rainfall and NTG bore data, focusing on Ti Tree Basin first.
-# - Analyse data first - e.g. a graph of bore data vs bore level is the same graph so no point comparing the two. - See 
-
-# Tasks Advised
-# 1 - "It would be good if they can automatically extract this data for the region of interest, that is a good idea."
-# 2 - "From this data I have asked the to consider seasonal changes like you do for rainfall, they could do that for bore data matched to local rainfall? To consider replenishment."
-# 3 - "I have suggested that they improve on the NTG bore map and enable users to click a location on a terrain map to add a bore reading to a single graph for comparison."
-
-# Think about:
-# What are the best types of data to compare / contrast
-# What information would this give us, and how might it be relevant for a groundwater report card
-# What does a groundwater report card generally look like
+# Create new 'Group34_Project_Code.py' file? or nah idk, this is a copy of the one in Backup-Version History so do whatever I guess.
 
 
-# Folium-Test.py Notes
-# Maybe add something like a GUI prompt for the user to filter location for data? Idk might be too complex atm
-# Could use a GUI for the data comparison tool, like 'choose first location + type of data (field / publish)', then 'choose second location + type'
-# - then generate a twin-plot (both data sets on the one graph) showing how both compare? Might need to work out how to get opposing data sets to look 
-# like a valuable comparison and not a jumbled mess / unintelligible graph first though
-
-# New Notes
-# Would having to open the generated html file to view the map be too much? I think Tkinter is an all-in-one 'run code' solution, but from what I read it
-# didn't have some of the features that folium has, so not sure yet which would be better.
-
+# Insert code from mainprojectcode-workfile.py or rename that one after going through and commenting idk.
 
 #### Might want to comment this out otherwise it runs every time, unless you only highlight the Folium code part and then hit 'Run' I guess. ###
 
