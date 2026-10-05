@@ -7,3 +7,12 @@ gwrc_trend_results.csv
 .venv_verify/
 __pycache__/
 .DS_Store
+
+# Ignore the virtual environment inside the krishna-code subfolder
+krishna-code/.venv/
+krishna-code/__pycache__/
+krishna-code/*.py[cod]
+krishna-code/.streamlit/secrets.toml
+krishna-code/.streamlit/config.toml
+krishna-code/.DS_Store
+krishna-code/Thumbs.db
