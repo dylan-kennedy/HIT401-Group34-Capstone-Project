@@ -1,0 +1,9 @@
+# Packages needed by the climate module (climate/).
+# The dashboard keeps its own list in krishna-code/requirements.txt, which is unchanged.
+streamlit
+pandas
+numpy
+plotly
+xarray
+netCDF4
+requests
