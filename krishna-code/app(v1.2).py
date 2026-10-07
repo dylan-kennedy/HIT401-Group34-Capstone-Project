@@ -1547,6 +1547,16 @@ def render_quality_panel():
         "Download PNG using the camera icon "
         "in the graph toolbar."
     )
+    with st.expander(f"📊 Statistical Summary: {measurement_name}"):
+        stat_df = graph_data[measurement_column].dropna()
+        if not stat_df.empty:
+            sc1, sc2, sc3, sc4 = st.columns(4)
+            sc1.metric("Min", f"{stat_df.min():,.2f}")
+            sc2.metric("Max", f"{stat_df.max():,.2f}")
+            sc3.metric("Mean", f"{stat_df.mean():,.2f}")
+            sc4.metric("Median", f"{stat_df.median():,.2f}")
+        else:
+            st.info("No numerical data available for statistical summary.")
 
     download1, download2 = st.columns(2)
 
