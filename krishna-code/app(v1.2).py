@@ -435,7 +435,22 @@ def load_data():
     bores,
     monitoring,
 ) = load_data()
+# ---------------------------------------------------------
+# EXECUTIVE SUMMARY METRICS (KPIs)
+# ---------------------------------------------------------
 
+kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
+with kpi_col1:
+    st.metric(label="Total Study Bores", value=f"{len(bores):,}")
+with kpi_col2:
+    st.metric(label="Quality Monitored Bores", value=f"{len(quality_locations):,}")
+with kpi_col3:
+    st.metric(label="Water Quality Samples", value=f"{len(quality):,}")
+with kpi_col4:
+    active_cnt = len(monitoring[monitoring["ACTIVE"] == "Yes"]) if "ACTIVE" in monitoring.columns else len(monitoring)
+    st.metric(label="Monitoring Bores", value=f"{active_cnt:,}")
+
+st.divider()
 
 # ---------------------------------------------------------
 # SELECTION FUNCTIONS
