@@ -561,6 +561,19 @@ if st.session_state.get("active_mode") != mode:
     st.session_state.active_mode = mode
     clear_selection()
 
+st.sidebar.divider()
+st.sidebar.subheader("🔍 Quick Search Bores")
+available_bores = sorted(list(set(quality_locations["BORE_NO"].dropna().tolist() + bores["BORE_NO"].dropna().tolist())))
+search_selection = st.sidebar.selectbox(
+    "Search bore by ID:",
+    options=["-- Select a Bore ID --"] + available_bores,
+    key="sidebar_bore_search"
+)
+if search_selection and search_selection != "-- Select a Bore ID --":
+    if search_selection not in st.session_state.selected_bores:
+        select_bore(search_selection)
+st.sidebar.divider()
+
 measurement_name = "Total dissolved solids"
 measurement_column = measurements[measurement_name]
 minimum_samples = 1
