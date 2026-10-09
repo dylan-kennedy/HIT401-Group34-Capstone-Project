@@ -23,7 +23,7 @@
     <button id="btn-map-view" class="toggle-btn active" type="button">Map</button>
     <button id="btn-climate-view" class="toggle-btn" type="button">Climate</button>
     <button id="btn-about" class="icon-btn" type="button" title="About / data sources">About</button>
-    <button id="btn-dark" class="icon-btn" type="button" title="Toggle dark mode">🌓</button>
+    <button id="btn-dark" class="icon-btn" type="button" title="Toggle dark mode" aria-label="Toggle dark mode">🌓</button>
   </nav>
 </header>
 
@@ -32,7 +32,7 @@
   <!-- ===================== MAP VIEW ===================== -->
   <div id="map-view" class="view">
     <aside id="sidebar">
-      <button id="sidebar-collapse" type="button" title="Collapse panel">«</button>
+      <button id="sidebar-collapse" type="button" title="Collapse panel" aria-label="Collapse filter panel">«</button>
       <div id="sidebar-content">
 
         <section class="panel-section">
@@ -95,20 +95,66 @@
       </div>
     </aside>
 
+    <!-- Map, splitter and detail panel share whatever width is left after the filter
+         sidebar. #place-summary lives in here too so its "bottom-left" position is
+         relative to the map area, not the whole page (it would otherwise sit under the
+         filter sidebar on the left). See app.js initSplitter()/setLayoutMode(). -->
+    <div id="map-drawer-wrap">
+    <!-- Only shown when the map is expanded to full width: the panel's own "Expand map"
+         toggle (inside #drawer) is hidden along with the rest of the panel in that
+         state, so this is the one way back without it. -->
+    <button id="btn-exit-map-expand" class="icon-btn hidden" type="button"
+            title="Return to split view" aria-label="Return to split view">⤢ Exit full-screen map</button>
     <div id="map"></div>
 
-    <aside id="drawer" class="hidden">
-      <button id="drawer-close" type="button" title="Close">✕</button>
-      <div id="drawer-header">
-        <h2 id="drawer-title">—</h2>
-        <p id="drawer-subtitle" class="caption"></p>
-        <button id="drawer-add-compare" type="button" class="hidden">+ Add to compare tray</button>
+    <!-- Draggable splitter between the map and the detail panel. Dragging adjusts the
+         width of #drawer (#map fills whatever's left); the ratio is remembered in
+         localStorage. See app.js initSplitter(). -->
+    <div id="splitter" role="separator" aria-orientation="vertical"
+         aria-label="Resize the map and the detail panel" tabindex="0"></div>
+
+    <aside id="drawer">
+      <!-- Everything here down to #drawer-tabs sits in one sticky wrapper, so there is
+           only ever one "top: 0" sticky calculation to get right, not several stacked
+           pixel offsets that break the moment a button wraps onto a second line at a
+           narrow panel width. -->
+      <div id="drawer-sticky-head">
+        <!-- Panel toolbar: always visible, independent of whether a location is
+             selected. Gaurab: this is the one toolbar for the whole right-hand panel —
+             add new panel-level actions (e.g. a future "export all" button) here, not
+             per-tab. Labels are kept short so 3 buttons + close fit even at the panel's
+             minimum width (~320px); full wording is in each button's title/aria-label. -->
+        <div id="panel-toolbar">
+          <div id="panel-toolbar-actions">
+            <button id="btn-reset-layout" class="icon-btn" type="button" title="Reset panel size to the default" aria-label="Reset panel size to the default">Reset</button>
+            <button id="btn-panel-expand" class="icon-btn" type="button" title="Expand panel to full width" aria-label="Expand panel to full width" aria-pressed="false">⛶ Panel</button>
+            <button id="btn-map-expand" class="icon-btn" type="button" title="Expand map to full width" aria-label="Expand map to full width" aria-pressed="false">⛶ Map</button>
+          </div>
+          <button id="drawer-close" type="button" title="Close" aria-label="Close detail panel">✕</button>
+        </div>
+        <div id="drawer-header">
+          <h2 id="drawer-title">—</h2>
+          <p id="drawer-subtitle" class="caption"></p>
+          <button id="drawer-add-compare" type="button" class="hidden">+ Add to compare tray</button>
+        </div>
+        <nav id="drawer-tabs"></nav>
       </div>
-      <nav id="drawer-tabs"></nav>
+
+      <!-- Empty state: shown whenever nothing is selected and the compare tray is empty.
+           Kept as a sibling of #drawer-header/#drawer-tabs/#drawer-body so
+           selectLocation()/openDrawer() in app.js need no changes — only its hidden
+           class is toggled, from updatePanelEmptyState(). -->
+      <div id="drawer-empty-state" class="empty-state panel-empty">
+        <p><strong>Nothing selected yet.</strong></p>
+        <p>Click a bore, gauge or BOM station on the map to see everything about it here,
+           or add bores to the compare tray on the left to overlay their charts.</p>
+      </div>
+
       <div id="drawer-body"></div>
     </aside>
 
     <div id="place-summary" class="hidden"></div>
+    </div>
   </div>
 
   <!-- ===================== CLIMATE VIEW ===================== -->
@@ -167,7 +213,7 @@
 
 <div id="about-panel" class="overlay-panel hidden">
   <div class="overlay-inner">
-    <button id="about-close" type="button" class="icon-btn">✕</button>
+    <button id="about-close" type="button" class="icon-btn" aria-label="Close About panel">✕</button>
     <div id="about-body"></div>
   </div>
 </div>
