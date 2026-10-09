@@ -27,6 +27,7 @@ const state = {
   threshold: 0,
   extentOnly: false,
   view: "map",            // "map" | "climate"
+  panelMode: "empty",     // "empty" | "detail" | "compare" — which thing the right panel is showing
 };
 
 const COMPARE_COLOURS = [
@@ -151,6 +152,148 @@ function writeURLState() {
   if (state.view !== "map") params.set("view", state.view);
   const newURL = `${window.location.pathname}?${params.toString()}`;
   window.history.replaceState(null, "", newURL);
+}
+
+// ---------------------------------------------------------------------------
+// LAYOUT: draggable splitter, expand/collapse, panel empty state, chart resize
+//
+// Pure layout/interaction — no data, API or chart-content logic lives here. The split
+// width is a CSS % on #drawer (map fills the rest via flex:1), persisted to
+// localStorage (wrapped in try/catch, per-browser convenience only, never required for
+// the page to work correctly if it's unavailable or cleared).
+// ---------------------------------------------------------------------------
+
+const PANEL_WIDTH_STORAGE_KEY = "webapp_panel_pct";
+const PANEL_DEFAULT_PCT = 42;   // within the requested 40-45% panel / 55-60% map split
+const PANEL_MIN_PCT = 26;
+const PANEL_MAX_PCT = 60;
+
+function resizeAllCharts() {
+  document.querySelectorAll(".chart").forEach((el) => {
+    if (el.data) {           // Plotly stamps .data onto a div once it has drawn a chart there
+      try { Plotly.Plots.resize(el); } catch (e) { /* not plotted yet, nothing to resize */ }
+    }
+  });
+}
+
+function readStoredPanelPct() {
+  try {
+    const raw = localStorage.getItem(PANEL_WIDTH_STORAGE_KEY);
+    const n = raw === null ? NaN : parseFloat(raw);
+    if (Number.isFinite(n) && n >= PANEL_MIN_PCT && n <= PANEL_MAX_PCT) return n;
+  } catch (e) { /* localStorage unavailable (private mode, cleared site data, etc.) */ }
+  return PANEL_DEFAULT_PCT;
+}
+
+function applyPanelWidth(pct) {
+  const clamped = Math.max(PANEL_MIN_PCT, Math.min(PANEL_MAX_PCT, pct));
+  const drawer = document.getElementById("drawer");
+  drawer.style.width = `${clamped}%`;
+  try { localStorage.setItem(PANEL_WIDTH_STORAGE_KEY, String(clamped)); } catch (e) { /* ignore */ }
+  resizeAllCharts();
+  return clamped;
+}
+
+function setLayoutMode(mode) {
+  // mode: "split" | "panel" | "map"
+  const wrap = document.getElementById("map-drawer-wrap");
+  const panelBtn = document.getElementById("btn-panel-expand");
+  const mapBtn = document.getElementById("btn-map-expand");
+  wrap.classList.remove("panel-expanded", "map-expanded");
+  if (mode === "panel") wrap.classList.add("panel-expanded");
+  if (mode === "map") wrap.classList.add("map-expanded");
+  panelBtn.setAttribute("aria-pressed", String(mode === "panel"));
+  mapBtn.setAttribute("aria-pressed", String(mode === "map"));
+  // The panel (and its own "Expand map" button) is hidden entirely in map-expanded
+  // mode, so this floating button is the only way back — see its comment in index.html.
+  document.getElementById("btn-exit-map-expand").classList.toggle("hidden", mode !== "map");
+  // Let the new widths land before resizing Leaflet/Plotly against them.
+  setTimeout(() => {
+    resizeAllCharts();
+    if (map) map.invalidateSize();
+  }, 60);
+}
+
+function initSplitter() {
+  const splitter = document.getElementById("splitter");
+  const wrap = document.getElementById("map-drawer-wrap");
+  let dragging = false;
+
+  applyPanelWidth(readStoredPanelPct());
+
+  function onMove(clientX) {
+    const rect = wrap.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const pct = ((rect.right - clientX) / rect.width) * 100;   // drawer is on the right
+    applyPanelWidth(pct);
+  }
+
+  splitter.addEventListener("mousedown", (e) => {
+    dragging = true;
+    splitter.classList.add("dragging");
+    e.preventDefault();
+  });
+  window.addEventListener("mousemove", (e) => { if (dragging) onMove(e.clientX); });
+  window.addEventListener("mouseup", () => {
+    if (!dragging) return;
+    dragging = false;
+    splitter.classList.remove("dragging");
+  });
+
+  splitter.addEventListener("touchstart", () => {
+    dragging = true;
+    splitter.classList.add("dragging");
+  }, { passive: true });
+  window.addEventListener("touchmove", (e) => {
+    if (dragging && e.touches[0]) onMove(e.touches[0].clientX);
+  }, { passive: true });
+  window.addEventListener("touchend", () => {
+    dragging = false;
+    splitter.classList.remove("dragging");
+  });
+
+  // Keyboard resizing: focus the splitter (it's a role="separator" with tabindex="0"),
+  // then use the arrow keys — the same interaction pattern browsers expect for sliders.
+  splitter.addEventListener("keydown", (e) => {
+    const current = parseFloat(document.getElementById("drawer").style.width) || PANEL_DEFAULT_PCT;
+    if (e.key === "ArrowLeft" || e.key === "ArrowUp") { applyPanelWidth(current + 2); e.preventDefault(); }
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") { applyPanelWidth(current - 2); e.preventDefault(); }
+  });
+
+  document.getElementById("btn-panel-expand").addEventListener("click", () => {
+    setLayoutMode(wrap.classList.contains("panel-expanded") ? "split" : "panel");
+  });
+  document.getElementById("btn-map-expand").addEventListener("click", () => {
+    setLayoutMode(wrap.classList.contains("map-expanded") ? "split" : "map");
+  });
+  document.getElementById("btn-exit-map-expand").addEventListener("click", () => setLayoutMode("split"));
+  document.getElementById("btn-reset-layout").addEventListener("click", () => {
+    try { localStorage.removeItem(PANEL_WIDTH_STORAGE_KEY); } catch (e) { /* ignore */ }
+    applyPanelWidth(PANEL_DEFAULT_PCT);
+    setLayoutMode("split");
+  });
+
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(resizeAllCharts, 150);
+  });
+}
+
+/**
+ * The right-hand panel is always visible, in one of three states: nothing selected and
+ * nothing being compared ("empty" — #drawer-empty-state shown), a location's detail
+ * view ("detail" — #drawer-header/#drawer-tabs/#drawer-body), or the compare overlay
+ * ("compare" — same three elements, repurposed by openCompareView()). This only ever
+ * toggles .hidden on existing elements; it never touches what selectLocation()/
+ * openCompareView() put inside them.
+ */
+function updatePanelEmptyState() {
+  const showContent = state.panelMode !== "empty";
+  document.getElementById("drawer-empty-state").classList.toggle("hidden", showContent);
+  ["drawer-header", "drawer-tabs", "drawer-body", "drawer-close"].forEach((id) => {
+    document.getElementById(id).classList.toggle("hidden", !showContent);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -331,7 +474,7 @@ async function showPlaceSummary(lat, lon) {
     const data = await fetchJSON("/api/place", { lat, lon });
     const nb = data.nearby;
     const rows = [
-      el("div", { class: "close-x", onclick: () => panel.classList.add("hidden") }, "✕"),
+      el("button", { class: "close-x", type: "button", "aria-label": "Close place summary", onclick: () => panel.classList.add("hidden") }, "✕"),
       el("div", {}, [el("strong", {}, "Place summary")]),
       el("div", { class: "caption" }, `${lat.toFixed(4)}, ${lon.toFixed(4)}`),
     ];
@@ -353,7 +496,7 @@ async function showPlaceSummary(lat, lon) {
     panel.innerHTML = "";
     rows.forEach((r) => panel.appendChild(r));
   } catch (err) {
-    panel.innerHTML = `<div class="close-x" onclick="this.parentElement.classList.add('hidden')">✕</div>Could not load this point: ${err.message}`;
+    panel.innerHTML = `<button type="button" class="close-x" aria-label="Close place summary" onclick="this.parentElement.classList.add('hidden')">✕</button>Could not load this point: ${err.message}`;
   }
 }
 
@@ -528,14 +671,14 @@ const TAB_LABELS = {
 async function selectLocation(type, id) {
   state.selected = { type, id };
   state.activeTab = "overview";
+  state.panelMode = "detail";
+  updatePanelEmptyState();
   writeURLState();
   await openDrawer();
   renderMarkers();
 }
 
 async function openDrawer() {
-  const drawer = document.getElementById("drawer");
-  drawer.classList.remove("hidden");
   document.getElementById("drawer-title").textContent = "Loading…";
   document.getElementById("drawer-body").innerHTML = "";
   showLoading(true);
@@ -638,6 +781,9 @@ function renderOverviewTab(body, { type, id }, detail) {
   if (detail.overview.bore_report_url) {
     body.appendChild(el("p", {}, [el("a", { href: detail.overview.bore_report_url, target: "_blank" }, "Bore report ↗")]));
   }
+  // GAURAB: rendered as-is from the source shapefile's WATER_DATA field. Some stored
+  // URLs use the old water.nt.gov.au domain instead of ntg.aquaticinformatics.net — see
+  // webapp/README.md "Known gaps". Rewrite the `portal` value here if fixing that.
   const portal = detail.overview.water_data_portal || detail.overview.monitor_portal_url;
   if (portal && String(portal).startsWith("http")) {
     body.appendChild(el("p", {}, [el("a", { href: portal, target: "_blank" }, "Open in NT Water Data Portal ↗")]));
@@ -683,7 +829,7 @@ async function renderWaterLevelTab(body, { id }, detail) {
       x: data.months, y: data.values, mode: "lines+markers", connectgaps: false,
       line: { color: "#0067a3" }, marker: { size: 4 },
     }], { ...plotlyTheme(), margin: { t: 20, r: 10, l: 50, b: 40 }, yaxis: { title: kind.includes("depth") ? "Depth below ground (m)" : "Water elevation (m AHD)" } },
-      { displaylogo: false });
+      { displaylogo: false, responsive: true });
     const rows = data.months.map((m, i) => ({ month: m, value: data.values[i] }));
     body.querySelectorAll(".chart-actions").forEach((n) => n.remove());
     plotlyDownloadButtons(body, "wl-chart", rows, `${id}_waterlevel_${kind}_${series}`);
@@ -717,7 +863,7 @@ async function renderWaterQualityTab(body, { id }, detail) {
     const data = await fetchJSON(`/api/water-quality/${id}`, { parameter: param });
     Plotly.newPlot("wq-chart", [{
       x: data.dates, y: data.values, mode: "lines+markers", line: { color: "#2f6f4e" },
-    }], { ...plotlyTheme(), margin: { t: 20, r: 10, l: 50, b: 40 }, yaxis: { title: param } }, { displaylogo: false });
+    }], { ...plotlyTheme(), margin: { t: 20, r: 10, l: 50, b: 40 }, yaxis: { title: param } }, { displaylogo: false, responsive: true });
     const rows = data.dates.map((d, i) => ({ sample_date: d, [param]: data.values[i] }));
     body.querySelectorAll(".chart-actions").forEach((n) => n.remove());
     plotlyDownloadButtons(body, "wq-chart", rows, `${id}_${param}`);
@@ -743,7 +889,7 @@ async function renderRainfallTab(body, { type, id }, detail) {
   body.appendChild(chartDiv);
   Plotly.newPlot("rain-chart", [
     { x: data.months, y: data.total_mm, type: "bar", name: "Monthly total (mm)", marker: { color: "#0067a3" } },
-  ], { ...plotlyTheme(), margin: { t: 20, r: 10, l: 50, b: 40 }, yaxis: { title: "mm" } }, { displaylogo: false });
+  ], { ...plotlyTheme(), margin: { t: 20, r: 10, l: 50, b: 40 }, yaxis: { title: "mm" } }, { displaylogo: false, responsive: true });
   body.appendChild(el("p", { class: "caption" }, `A month counts as missing if more than ${data.max_blank_days_rule} days are blank; missing months are left as gaps.`));
   const rows = data.months.map((m, i) => ({ month: m, total_mm: data.total_mm[i], complete: data.complete[i] }));
   plotlyDownloadButtons(body, "rain-chart", rows, `rainfall_${stationId}`);
@@ -769,7 +915,7 @@ async function renderRiverFlowTab(body, { type, id }, detail) {
   body.appendChild(chartDiv);
   Plotly.newPlot("flow-chart", [
     { x: data.months, y: data.total_ML, type: "bar", name: "Monthly volume (ML)", marker: { color: "#2f6f4e" } },
-  ], { ...plotlyTheme(), margin: { t: 20, r: 10, l: 50, b: 40 }, yaxis: { title: "ML/month" } }, { displaylogo: false });
+  ], { ...plotlyTheme(), margin: { t: 20, r: 10, l: 50, b: 40 }, yaxis: { title: "ML/month" } }, { displaylogo: false, responsive: true });
   const rows = data.months.map((m, i) => ({ month: m, total_ML: data.total_ML[i], complete: data.complete[i] }));
   plotlyDownloadButtons(body, "flow-chart", rows, "flow_G0280010");
 }
@@ -820,12 +966,29 @@ function renderAquiferTab(body, _loc, detail) {
   body.appendChild(el("p", { class: "caption" }, "Regional interpretations — may differ from this bore's own result."));
 }
 
-document.getElementById("drawer-close").addEventListener("click", () => {
-  document.getElementById("drawer").classList.add("hidden");
+/**
+ * The one handler for the drawer's close button, whatever state.panelMode currently is.
+ * Closing the compare view restores whatever location was selected before it was
+ * opened (if any) rather than unconditionally clearing the selection — openCompareView()
+ * does not touch state.selected, so it's still there to go back to.
+ */
+function closeDrawerPanel() {
+  if (state.panelMode === "compare") {
+    document.getElementById("drawer-add-compare").classList.remove("hidden");
+    if (state.selected) {
+      state.panelMode = "detail";
+      updatePanelEmptyState();
+      openDrawer();
+      return;
+    }
+  }
   state.selected = null;
+  state.panelMode = "empty";
+  updatePanelEmptyState();
   writeURLState();
   renderMarkers();
-});
+}
+document.getElementById("drawer-close").addEventListener("click", closeDrawerPanel);
 
 // ---------------------------------------------------------------------------
 // COMPARE TRAY
@@ -862,8 +1025,8 @@ function renderCompareTray() {
 
 async function openCompareView() {
   if (state.compareIds.length < 2) return;
-  const drawer = document.getElementById("drawer");
-  drawer.classList.remove("hidden");
+  state.panelMode = "compare";
+  updatePanelEmptyState();
   document.getElementById("drawer-title").textContent = "Compare bores";
   document.getElementById("drawer-subtitle").textContent = state.compareIds.join(", ");
   document.getElementById("drawer-add-compare").classList.add("hidden");
@@ -888,7 +1051,7 @@ async function openCompareView() {
         const data = await fetchJSON(`/api/water-quality/${boreId}`, { parameter: param });
         traces.push({ x: data.dates, y: data.values, mode: "lines+markers", name: boreId, line: { color: state.compareColours[boreId] } });
       }
-      Plotly.newPlot("cmp-wq-chart", traces, { ...plotlyTheme(), margin: { t: 20, r: 10, l: 50, b: 40 }, yaxis: { title: param }, legend: { orientation: "h" } }, { displaylogo: false });
+      Plotly.newPlot("cmp-wq-chart", traces, { ...plotlyTheme(), margin: { t: 20, r: 10, l: 50, b: 40 }, yaxis: { title: param }, legend: { orientation: "h" } }, { displaylogo: false, responsive: true });
     } finally { showLoading(false); }
   }
   paramSelect.addEventListener("change", drawWQ);
@@ -905,21 +1068,31 @@ async function openCompareView() {
     } catch (e) { /* this bore has no such series — simply not plotted */ }
   }
   if (traces.length) {
-    Plotly.newPlot("cmp-wl-chart", traces, { ...plotlyTheme(), margin: { t: 20, r: 10, l: 50, b: 40 }, yaxis: { title: "m AHD" }, legend: { orientation: "h" } }, { displaylogo: false });
+    Plotly.newPlot("cmp-wl-chart", traces, { ...plotlyTheme(), margin: { t: 20, r: 10, l: 50, b: 40 }, yaxis: { title: "m AHD" }, legend: { orientation: "h" } }, { displaylogo: false, responsive: true });
   } else {
     wlChart.innerHTML = "<p class='empty-state'>None of the selected bores have a Water Elevation (AHD) Publish series.</p>";
   }
 
-  document.getElementById("drawer-close").onclick = () => {
-    drawer.classList.add("hidden");
-    document.getElementById("drawer-add-compare").classList.remove("hidden");
-  };
+  // GAURAB: a "Download data (CSV)" button for the whole comparison (all selected
+  // bores' series together, not just one chart's PNG via the Plotly toolbar) is planned
+  // here — see webapp/README.md "Known gaps". Each chart above (#cmp-wq-chart,
+  // #cmp-wl-chart) already has its data in `traces`/the per-bore fetch results in this
+  // function if you want to build the CSV from what's already loaded rather than
+  // re-fetching. closeDrawerPanel() (near the top-level drawer-close listener) is what
+  // runs when this view is closed — it already knows to come back here via panelMode.
 }
 
 // ---------------------------------------------------------------------------
 // CLIMATE VIEW
 // ---------------------------------------------------------------------------
 
+// GAURAB: climate_models.py's seasonal_totals_observed/seasonal_totals_model,
+// lag_correlations and plot_rain_flow_bores are not wired into any endpoint yet (only
+// water_year_totals/anomalies/trailing_mean/change_table are, via /api/climate/anomaly
+// and /api/climate/wetter-drier). A natural place for a new "Seasonal / lag" section is
+// a new <h3> block appended inside #climate-body below, paired with new
+// /api/climate/seasonal and /api/climate/lag endpoints in server.py. See
+// webapp/README.md "Known gaps".
 async function initClimateView() {
   const locationSelect = document.getElementById("climate-location");
   const runSelect = document.getElementById("climate-run");
@@ -955,7 +1128,7 @@ async function initClimateView() {
       { x: data.trailing_mean.years, y: data.trailing_mean.anomaly_mm, mode: "lines",
         name: `${data.trailing_mean_window_years}-year moving mean`, line: { color: data.line_color, width: 1.8 } },
     ], { ...plotlyTheme(), title: data.title, shapes, margin: { t: 50, r: 20, l: 60, b: 40 },
-         yaxis: { title: "Difference from reference average (mm)" } }, { displaylogo: false });
+         yaxis: { title: "Difference from reference average (mm)" } }, { displaylogo: false, responsive: true });
     state._anomalyRows = data.years.map((y, i) => ({ water_year: y, anomaly_mm: data.anomaly_mm[i] }));
   }
 
@@ -970,7 +1143,7 @@ async function initClimateView() {
       { x: data.median_pct, y: data.labels, mode: "markers", name: "Median year",
         marker: { symbol: "line-ns", size: 13, line: { color: data.line_color, width: 2 } } },
     ], { ...plotlyTheme(), title: `Is ${loc} getting wetter or drier?`, margin: { t: 50, r: 20, l: 160, b: 40 },
-         xaxis: { title: "Change in average water-year rainfall (%)" } }, { displaylogo: false });
+         xaxis: { title: "Change in average water-year rainfall (%)" } }, { displaylogo: false, responsive: true });
     state._wetterRows = data.labels.map((l, i) => ({ model_run: l, mean_pct: data.mean_pct[i], median_pct: data.median_pct[i] }));
   }
 
@@ -984,7 +1157,7 @@ async function initClimateView() {
         name: "Cumulative residual", line: { color: "#000", width: 2 }, yaxis: "y2" },
     ], { ...plotlyTheme(), margin: { t: 20, r: 50, l: 50, b: 40 },
          yaxis: { title: isFlow ? "ML/month" : "mm/month" }, yaxis2: { overlaying: "y", side: "right", title: "Cumulative residual" },
-         legend: { orientation: "h" } }, { displaylogo: false });
+         legend: { orientation: "h" } }, { displaylogo: false, responsive: true });
   }
 
   locationSelect.addEventListener("change", refreshRuns);
@@ -1064,6 +1237,8 @@ function initAbout() {
 async function init() {
   initTheme();
   initMap();
+  initSplitter();
+  updatePanelEmptyState();
   initSearch();
   initSidebar();
   initViewSwitch();
