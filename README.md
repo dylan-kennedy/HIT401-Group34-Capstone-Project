@@ -75,3 +75,18 @@ Unzip 'data.zip' from krishna-code/
 
 "streamlit run krishna-code\\"app(v1.2).py"" - include quotes around "app(v1.2).py", until we rename it.
 
+
+Running dylan's version, similar commands.
+
+Extract the data.zip folder into the same dylan-code folder first.
+
+"python -m venv dylan-code/.venv"
+
+"dylan-code/.venv/Scripts/activate.ps1"
+(If the above doesn't work, try this first: "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass" - temporary bypass for scripts being disabled on windows machines)
+
+"pip install -r dylan-code/requirements.txt"
+
+"streamlit run dylan-code\Updated_Dashboard_Prototype.py"
+
+"deactivate" when finished & delete .venv folder if you wish.

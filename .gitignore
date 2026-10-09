@@ -8,7 +8,7 @@ gwrc_trend_results.csv
 __pycache__/
 .DS_Store
 
-# Ignore the virtual environment inside the krishna-code subfolder
+# Ignore the virtual environment inside the krishna-code subfolder & dylan-code subfolder
 krishna-code/.venv/
 krishna-code/__pycache__/
 krishna-code/*.py[cod]
@@ -16,3 +16,15 @@ krishna-code/.streamlit/secrets.toml
 krishna-code/.streamlit/config.toml
 krishna-code/.DS_Store
 krishna-code/Thumbs.db
+
+dylan-code/.venv/
+dylan-code/__pycache__/
+dylan-code/*.py[cod]
+dylan-code/.streamlit/secrets.toml
+dylan-code/.streamlit/config.toml
+dylan-code/.DS_Store
+dylan-code/Thumbs.db
+
+# Ignore the data folder as well inside that subfolder, too big to store on github repo (need to manually unzip each time source is downloaded for now)
+krishna-code/data
+dylan-code/data
