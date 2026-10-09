@@ -1,0 +1,343 @@
+/* webapp/static/styles.css — HIT401 Group 34 Data Explorer
+ *
+ * Layout pass (this file + the map/drawer markup in index.html + the splitter/expand
+ * logic in app.js): rebalanced map/panel split with a draggable splitter, a bigger and
+ * always-visible detail panel with a clear empty state, taller responsive charts,
+ * sticky panel header, bigger base font, visible focus states, and proper mobile
+ * stacking. No data, API or chart-content logic changed here or in the matching app.js
+ * additions — only layout, styling and interaction.
+ */
+
+:root {
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-2: #f0f1ef;
+  --border: #d9dad6;
+  --text: #1c1e1b;
+  --text-muted: #5b5f58;
+  --accent: #2f6f4e;
+  --accent-contrast: #ffffff;
+  --warn-bg: #fff4e5;
+  --warn-text: #7a4b00;
+  --danger: #b4242c;
+  --link: #1d5fa8;
+  --shadow: 0 2px 10px rgba(0,0,0,0.08);
+  --radius: 8px;
+  --topbar-h: 56px;
+  --panel-toolbar-h: 46px;
+  --panel-default-pct: 42%;   /* panel width target: 40-45%, map gets the rest (~58-60%) */
+  --panel-min-pct: 26%;
+  --panel-max-pct: 60%;
+}
+
+:root[data-theme="dark"] {
+  --bg: #15171a;
+  --surface: #1e2124;
+  --surface-2: #26292d;
+  --border: #35393d;
+  --text: #ecefe9;
+  --text-muted: #b7bbb1;
+  --accent: #5fbf8e;
+  --accent-contrast: #0c120e;
+  --warn-bg: #3a2c12;
+  --warn-text: #f0c479;
+  --danger: #ff6b70;
+  --link: #7db8f0;
+  --shadow: 0 2px 14px rgba(0,0,0,0.5);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: "Helvetica Neue", Arial, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+button, select, input { font-family: inherit; font-size: inherit; }
+
+/* Visible keyboard focus everywhere, on top of whatever a browser default is. */
+a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------------- Top bar ---------------- */
+#topbar {
+  height: var(--topbar-h);
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.brand { font-weight: 700; font-size: 15px; white-space: nowrap; }
+.brand-sub { font-weight: 400; color: var(--text-muted); margin-left: 6px; }
+
+#search-wrap { position: relative; flex: 1; max-width: 420px; }
+#search-input {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface-2); color: var(--text);
+}
+#search-results {
+  position: absolute; top: 40px; left: 0; right: 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); max-height: 320px; overflow-y: auto; z-index: 1000;
+}
+#search-results .result-row {
+  padding: 8px 10px; cursor: pointer; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+#search-results .result-row:hover, #search-results .result-row:focus-visible { background: var(--surface-2); }
+#search-results .result-row.no-match { cursor: default; color: var(--text-muted); font-size: 12.5px; }
+
+#topbar-actions { display: flex; gap: 8px; margin-left: auto; }
+.toggle-btn, .icon-btn {
+  padding: 7px 14px; border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text); cursor: pointer; white-space: nowrap;
+}
+.toggle-btn.active { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
+.toggle-btn:hover, .icon-btn:hover { filter: brightness(0.96); }
+.icon-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
+
+/* ---------------- Overall layout ---------------- */
+#main { height: calc(100% - var(--topbar-h)); position: relative; }
+.view { height: 100%; width: 100%; }
+.view.hidden { display: none; }
+
+#map-view { display: flex; height: 100%; min-width: 0; }
+
+#sidebar {
+  width: 300px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border);
+  overflow-y: auto; position: relative; transition: width 0.15s ease;
+}
+#sidebar.collapsed { width: 28px; overflow: hidden; }
+#sidebar.collapsed #sidebar-content { display: none; }
+#sidebar-collapse {
+  position: absolute; top: 8px; right: 6px; border: none; background: none; cursor: pointer;
+  font-size: 14px; color: var(--text-muted); z-index: 2; padding: 4px;
+}
+#sidebar.collapsed #sidebar-collapse { transform: rotate(180deg); right: auto; left: 6px; }
+
+#sidebar-content { padding: 14px; }
+.panel-section { margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.panel-section h3 { margin: 0 0 8px; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); }
+.panel-section label { display: block; font-size: 13.5px; margin-bottom: 6px; cursor: pointer; }
+.panel-section .sub-label { margin-left: 2px; color: var(--text-muted); }
+.panel-section select { width: 100%; margin-bottom: 8px; padding: 5px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); }
+.panel-section input[type="range"] { width: 100%; }
+.count { color: var(--text-muted); font-size: 12px; }
+.caption { font-size: 13px; color: var(--text-muted); line-height: 1.45; margin: 4px 0; }
+
+.legend { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; font-size: 12.5px; }
+.legend-row { display: flex; align-items: center; gap: 6px; }
+.legend-dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.25); flex-shrink: 0; }
+
+#compare-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; min-height: 20px; }
+.compare-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 12px;
+  color: white; font-size: 12px; font-weight: 600;
+}
+.compare-chip button { background: none; border: none; color: inherit; cursor: pointer; font-weight: 700; padding: 0 2px; }
+#btn-compare {
+  width: 100%; padding: 8px; border-radius: var(--radius); border: 1px solid var(--accent);
+  background: var(--accent); color: var(--accent-contrast); cursor: pointer;
+}
+#btn-compare:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Map + splitter + panel share the remaining width after the filter sidebar. The panel's
+   width is set in % by app.js (initSplitter / applyPanelWidth), persisted in
+   localStorage; map fills whatever's left via flex:1. This is what keeps the ~58/42
+   (map/panel) balance correct at both 1366x768 and 1920x1080 without two numbers to
+   keep in sync. */
+#map-drawer-wrap { flex: 1 1 auto; display: flex; min-width: 0; position: relative; }
+
+#map { flex: 1 1 auto; position: relative; min-width: 240px; }
+
+/* ---------------- Splitter ---------------- */
+#splitter {
+  flex: 0 0 8px; width: 8px; cursor: col-resize; background: var(--border);
+  position: relative; z-index: 10;
+}
+#splitter::after {
+  content: ""; position: absolute; top: 50%; left: 50%; width: 3px; height: 32px;
+  transform: translate(-50%, -50%); border-radius: 2px; background: var(--text-muted); opacity: 0.6;
+}
+#splitter:hover, #splitter:focus-visible, #splitter.dragging { background: var(--accent); }
+#splitter:hover::after, #splitter:focus-visible::after, #splitter.dragging::after { opacity: 0.9; background: var(--accent-contrast); }
+
+/* Expand states: one side takes the full width of #map-drawer-wrap, splitter hidden. */
+#map-drawer-wrap.panel-expanded #map,
+#map-drawer-wrap.panel-expanded #splitter { display: none; }
+#map-drawer-wrap.panel-expanded #drawer { width: 100% !important; flex: 1 1 auto; }
+
+#map-drawer-wrap.map-expanded #drawer,
+#map-drawer-wrap.map-expanded #splitter { display: none; }
+#map-drawer-wrap.map-expanded #map { flex: 1 1 auto; }
+
+#btn-exit-map-expand {
+  position: absolute; top: 10px; right: 10px; z-index: 950; box-shadow: var(--shadow);
+}
+#btn-exit-map-expand.hidden { display: none; }
+
+/* ---------------- Drawer / detail panel ---------------- */
+#drawer {
+  width: var(--panel-default-pct); min-width: 320px; max-width: var(--panel-max-pct);
+  flex: 0 0 auto; background: var(--surface); border-left: 1px solid var(--border);
+  overflow-y: auto; position: relative; font-size: 15px; display: flex; flex-direction: column;
+}
+
+/* Everything that should stay visible while #drawer-body scrolls — toolbar, header,
+   tabs — lives in ONE sticky wrapper with a single top:0. That means there is only one
+   sticky offset to ever get right, instead of three stacked pixel guesses that break
+   the moment any one of them changes height (e.g. a button wrapping at a narrow panel
+   width, which is exactly what broke the three-separate-stickies version of this). */
+#drawer-sticky-head {
+  position: sticky; top: 0; z-index: 6; background: var(--surface); flex-shrink: 0;
+}
+
+#panel-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  min-height: var(--panel-toolbar-h); padding: 6px 10px 6px 14px; border-bottom: 1px solid var(--border);
+}
+#panel-toolbar-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+#panel-toolbar-actions .icon-btn { padding: 5px 10px; font-size: 12px; }
+#drawer-close {
+  border: none; background: none; cursor: pointer; font-size: 16px; color: var(--text-muted);
+  padding: 6px 8px; border-radius: 6px; flex-shrink: 0;
+}
+#drawer-close:hover { background: var(--surface-2); }
+
+.empty-state { color: var(--text-muted); font-size: 14px; padding: 20px; text-align: center; line-height: 1.5; }
+.panel-empty { padding: 48px 24px; }
+.panel-empty strong { color: var(--text); font-size: 15px; }
+#drawer-empty-state.hidden { display: none; }
+
+#drawer-header { padding: 14px 16px 12px; border-bottom: 1px solid var(--border); }
+#drawer-header.hidden, #drawer-tabs.hidden, #drawer-body.hidden, #drawer-close.hidden { display: none; }
+#drawer-title { margin: 0; font-size: 19px; line-height: 1.3; }
+#drawer-subtitle { font-size: 13px; margin: 4px 0 0; }
+#drawer-add-compare {
+  margin-top: 10px; padding: 7px 12px; font-size: 13px; border-radius: 6px;
+  border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer;
+}
+#drawer-tabs {
+  display: flex; flex-wrap: wrap; gap: 2px; padding: 8px 10px; border-bottom: 1px solid var(--border);
+}
+#drawer-tabs button {
+  padding: 7px 11px; font-size: 13.5px; border: none; background: none; color: var(--text-muted);
+  cursor: pointer; border-radius: 6px;
+}
+#drawer-tabs button.active { background: var(--surface-2); color: var(--text); font-weight: 600; }
+#drawer-tabs button:hover { background: var(--surface-2); }
+#drawer-body { padding: 16px 16px 24px; flex: 1; }
+
+.field-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 14.5px; border-bottom: 1px dashed var(--border); }
+.field-row .k { color: var(--text-muted); }
+.field-row .v { text-align: right; }
+
+.checklist-row { display: flex; align-items: center; gap: 8px; font-size: 14.5px; padding: 4px 0; }
+.dot-yes { color: var(--accent); font-size: 15px; }
+.dot-no { color: var(--text-muted); font-size: 15px; }
+
+.note-box {
+  background: var(--warn-bg); color: var(--warn-text); border-radius: 6px; padding: 10px 12px;
+  font-size: 13.5px; margin: 10px 0; line-height: 1.5;
+}
+
+/* Charts: taller and responsive. app.js's Plotly calls use config.responsive = true and
+   call Plotly.Plots.resize() after the splitter moves or the window resizes, so a chart
+   never gets clipped or stays stale-sized at a new panel width. */
+.chart { width: 100%; height: 420px; min-height: 380px; margin: 10px 0; }
+.chart-actions { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+.chart-actions button {
+  font-size: 13px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text); cursor: pointer;
+}
+.chart-actions button:hover { filter: brightness(0.96); }
+
+/* Gaurab: the compare-tray overlay charts (openCompareView in app.js) render into
+   #cmp-wq-chart / #cmp-wl-chart using the same .chart sizing above, and their
+   .chart-actions row is where a future "Download data (CSV)" button for the whole
+   comparison belongs — each currently only gets PNG via the Plotly toolbar. */
+
+/* ---------------- Place summary popup ---------------- */
+#place-summary {
+  position: absolute; bottom: 16px; left: 16px; max-width: 320px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 12px 14px; font-size: 13.5px; z-index: 900;
+}
+#place-summary.hidden { display: none; }
+#place-summary .close-x {
+  position: absolute; top: 6px; right: 8px; cursor: pointer; color: var(--text-muted);
+  padding: 4px; border: none; background: none; font-size: inherit; line-height: 1;
+}
+
+/* ---------------- Climate view ---------------- */
+#climate-view { overflow-y: auto; background: var(--surface); }
+#climate-body { max-width: 980px; margin: 0 auto; padding: 24px; font-size: 15px; }
+#climate-body h2 { margin-top: 0; }
+#climate-body h3 {
+  margin-top: 32px; position: sticky; top: 0; background: var(--surface); padding: 8px 0;
+  z-index: 3;
+}
+#climate-body select { padding: 7px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); margin-bottom: 10px; font-size: 14px; }
+#climate-body label { display: block; font-size: 13px; color: var(--text-muted); margin-top: 10px; }
+#climate-body .chart { height: 440px; min-height: 400px; }
+
+/* ---------------- About overlay ---------------- */
+.overlay-panel {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 2000;
+  display: flex; align-items: center; justify-content: center;
+}
+.overlay-panel.hidden { display: none; }
+.overlay-inner {
+  background: var(--surface); border-radius: var(--radius); max-width: 720px; width: 90%;
+  max-height: 85vh; overflow-y: auto; padding: 24px 28px; position: relative;
+}
+#about-close { position: absolute; top: 12px; right: 14px; }
+#about-body h3 { margin-top: 24px; }
+#about-body ul { padding-left: 20px; }
+#about-body code { background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
+
+#loading-indicator {
+  position: fixed; top: 64px; right: 16px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 12px; font-size: 12px; box-shadow: var(--shadow); z-index: 3000;
+}
+#loading-indicator.hidden { display: none; }
+
+/* ---------------- Leaflet popups adopt the theme ---------------- */
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--text); }
+.leaflet-control-layers label { font-size: 13px; }
+
+/* ---------------- Tablet: panel gets a bit more room automatically via % width,
+   nothing extra needed here — only the phone breakpoint changes structure. --------- */
+
+/* ---------------- Phone width: map above panel, normal flow, no horizontal scroll --- */
+@media (max-width: 760px) {
+  body { overflow-y: auto; overflow-x: hidden; }
+  #main { height: auto; min-height: calc(100% - var(--topbar-h)); overflow: visible; }
+  #map-view { flex-direction: column; height: auto; }
+
+  #sidebar {
+    width: 100%; max-height: 42vh; border-right: none; border-bottom: 1px solid var(--border);
+    order: 1;
+  }
+  #sidebar.collapsed { max-height: 38px; }
+
+  #map-drawer-wrap { flex-direction: column; width: 100%; order: 2; }
+  #splitter { display: none; }   /* dragging a horizontal split on a column stack adds nothing useful */
+
+  #map { height: 46vh; min-height: 280px; flex: none; order: 1; }
+
+  #drawer {
+    width: 100% !important; max-width: none; min-width: 0; max-height: none;
+    border-left: none; border-top: 1px solid var(--border); order: 2; font-size: 15px;
+  }
+  #panel-toolbar-actions { gap: 4px; }
+  #panel-toolbar-actions .icon-btn { padding: 5px 7px; font-size: 11.5px; }
+
+  .brand-sub { display: none; }
+  #search-wrap { max-width: none; }
+  #place-summary { left: 8px; right: 8px; max-width: none; }
+}
