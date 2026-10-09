@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HIT401 Group 34 — Data Explorer</title>
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
+<link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.Default.css">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">HIT401 Group 34 <span class="brand-sub">Data Explorer</span></div>
+
+  <div id="search-wrap">
+    <input id="search-input" type="text" placeholder="Search bore ID, name, gauge or BOM station…" autocomplete="off">
+    <div id="search-results" class="hidden"></div>
+  </div>
+
+  <nav id="topbar-actions">
+    <button id="btn-map-view" class="toggle-btn active" type="button">Map</button>
+    <button id="btn-climate-view" class="toggle-btn" type="button">Climate</button>
+    <button id="btn-about" class="icon-btn" type="button" title="About / data sources">About</button>
+    <button id="btn-dark" class="icon-btn" type="button" title="Toggle dark mode">🌓</button>
+  </nav>
+</header>
+
+<main id="main">
+
+  <!-- ===================== MAP VIEW ===================== -->
+  <div id="map-view" class="view">
+    <aside id="sidebar">
+      <button id="sidebar-collapse" type="button" title="Collapse panel">«</button>
+      <div id="sidebar-content">
+
+        <section class="panel-section">
+          <h3>Show on map</h3>
+          <label><input type="checkbox" id="chk-bores" checked> Bores <span class="count" id="count-bores"></span></label>
+          <label><input type="checkbox" id="chk-gauges" checked> River / stream gauges <span class="count" id="count-gauges"></span></label>
+          <label><input type="checkbox" id="chk-bom-nt" checked> BOM rainfall stations (NT) <span class="count" id="count-bom-nt"></span></label>
+          <label><input type="checkbox" id="chk-bom-other"> BOM rainfall stations (not NT) <span class="count" id="count-bom-other"></span></label>
+          <label class="sub-label"><input type="checkbox" id="chk-monitoring-only"> Only bores that are monitoring locations</label>
+          <label class="sub-label"><input type="checkbox" id="chk-extent"> Only show locations within the current map view</label>
+        </section>
+
+        <section class="panel-section">
+          <h3>Colour bores by</h3>
+          <select id="colour-by">
+            <option value="status">Status</option>
+            <option value="purpose">Purpose</option>
+            <option value="has_water_level">Has water-level series</option>
+            <option value="has_water_quality">Has water-quality samples</option>
+            <option value="yield_ls">Yield (L/s) — threshold</option>
+            <option value="waterlevel_m">Recorded water level (m) — threshold</option>
+            <option value="chemical">Chemical parameter — threshold</option>
+          </select>
+
+          <div id="chemical-controls" class="hidden">
+            <select id="chemical-parameter"></select>
+            <select id="chemical-statistic">
+              <option value="latest">Latest result</option>
+              <option value="mean">Historical average</option>
+              <option value="max">Historical maximum</option>
+              <option value="min">Historical minimum</option>
+            </select>
+          </div>
+
+          <div id="threshold-controls" class="hidden">
+            <label for="threshold-slider">Threshold: <span id="threshold-value">—</span></label>
+            <input type="range" id="threshold-slider">
+            <p class="caption">No guideline value is applied automatically — set your own threshold. Default shown is this attribute's own median.</p>
+          </div>
+
+          <div id="colour-legend" class="legend"></div>
+        </section>
+
+        <section class="panel-section">
+          <h3>Filters</h3>
+          <label for="filter-status">Status</label>
+          <select id="filter-status" multiple size="4"></select>
+          <label for="filter-purpose">Purpose</label>
+          <select id="filter-purpose" multiple size="4"></select>
+          <p class="caption">Leave nothing selected in a box to include every value.</p>
+        </section>
+
+        <section class="panel-section">
+          <h3>Compare tray <span class="count" id="compare-count">(0/5)</span></h3>
+          <div id="compare-list"></div>
+          <button id="btn-compare" type="button" disabled>Compare selected</button>
+          <p class="caption">Click up to 5 bore markers while holding the “Add to compare” action in a bore’s drawer.</p>
+        </section>
+
+      </div>
+    </aside>
+
+    <div id="map"></div>
+
+    <aside id="drawer" class="hidden">
+      <button id="drawer-close" type="button" title="Close">✕</button>
+      <div id="drawer-header">
+        <h2 id="drawer-title">—</h2>
+        <p id="drawer-subtitle" class="caption"></p>
+        <button id="drawer-add-compare" type="button" class="hidden">+ Add to compare tray</button>
+      </div>
+      <nav id="drawer-tabs"></nav>
+      <div id="drawer-body"></div>
+    </aside>
+
+    <div id="place-summary" class="hidden"></div>
+  </div>
+
+  <!-- ===================== CLIMATE VIEW ===================== -->
+  <div id="climate-view" class="view hidden">
+    <div id="climate-body">
+      <h2>Climate model projections (CMIP6, SSP2-4.5)</h2>
+      <p class="caption">Water-year rainfall (1 September – 31 August) from CMIP6 climate models, for the single
+        model grid cell nearest each location. Numbers are computed live from this project's own
+        <code>climate/climate_models.py</code> — nothing here is re-typed from the slides.</p>
+
+      <label for="climate-location">Location</label>
+      <select id="climate-location">
+        <option value="Darwin">Darwin</option>
+        <option value="Ti Tree">Ti Tree</option>
+      </select>
+
+      <h3>Water-year rainfall, one model run at a time</h3>
+      <label for="climate-run">Model run</label>
+      <select id="climate-run"></select>
+      <div id="climate-anomaly-caption" class="caption"></div>
+      <div id="climate-anomaly-chart" class="chart"></div>
+      <div class="chart-actions">
+        <button class="btn-download-png" data-target="climate-anomaly-chart" data-name="anomaly_bars">Download PNG</button>
+        <button class="btn-download-csv" id="btn-csv-anomaly">Download CSV</button>
+      </div>
+
+      <h3>Every model side by side</h3>
+      <div id="climate-wetter-caption" class="caption"></div>
+      <div id="climate-wetter-chart" class="chart"></div>
+      <div class="chart-actions">
+        <button class="btn-download-png" data-target="climate-wetter-chart" data-name="wetter_or_drier">Download PNG</button>
+        <button class="btn-download-csv" id="btn-csv-wetter">Download CSV</button>
+      </div>
+
+      <h3>Observed rainfall: residual mass</h3>
+      <p class="caption">Each month's rainfall total minus the long-term average for that same calendar month,
+        accumulated. A rising line is a wetter-than-usual run, a falling line a drier one. After the BOM AWRA
+        technical supplement.</p>
+      <div id="climate-rain-residual-chart" class="chart"></div>
+      <div class="chart-actions">
+        <button class="btn-download-png" data-target="climate-rain-residual-chart" data-name="rainfall_residual_mass">Download PNG</button>
+        <button class="btn-download-csv" id="btn-csv-rain-residual">Download CSV</button>
+      </div>
+
+      <h3>River flow: residual mass</h3>
+      <p class="caption">Same idea, for gauge G0280010 (Woodforde River at Arden Soak), in megalitres/month.</p>
+      <div id="climate-flow-residual-chart" class="chart"></div>
+      <div class="chart-actions">
+        <button class="btn-download-png" data-target="climate-flow-residual-chart" data-name="flow_residual_mass">Download PNG</button>
+        <button class="btn-download-csv" id="btn-csv-flow-residual">Download CSV</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div id="about-panel" class="overlay-panel hidden">
+  <div class="overlay-inner">
+    <button id="about-close" type="button" class="icon-btn">✕</button>
+    <div id="about-body"></div>
+  </div>
+</div>
+
+<div id="loading-indicator" class="hidden">Loading…</div>
+
+<script src="/vendor/leaflet/leaflet.js"></script>
+<script src="/vendor/markercluster/leaflet.markercluster.js"></script>
+<script src="/vendor/plotly/plotly-2.35.2.min.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

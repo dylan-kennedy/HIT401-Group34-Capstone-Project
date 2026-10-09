@@ -28,3 +28,14 @@ dylan-code/Thumbs.db
 # Ignore the data folder as well inside that subfolder, too big to store on github repo (need to manually unzip each time source is downloaded for now)
 krishna-code/data
 dylan-code/data
+
+# webapp/ (FastAPI + Leaflet + Plotly data explorer): the generated cache, including an
+# extracted copy of krishna-code/data.zip's shapefiles, is rebuilt by webapp/build_cache.py
+# and is too big for the repo (two files alone are 60MB and 134MB) - never commit it.
+webapp/cache/
+webapp/.venv/
+webapp/__pycache__/
+webapp/**/__pycache__/
+# The repo-wide *.png rule above would otherwise also strip Leaflet's own vendored marker
+# icons, which the map needs to render pins at all.
+!webapp/static/vendor/**/*.png
