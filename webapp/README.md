@@ -21,10 +21,10 @@ python3 -m venv ~/venvs/hit401_web
 
 Packages included: `fastapi`, `uvicorn`, `pandas`, `numpy`, `geopandas`, `pyogrio`, `shapely`, `pyarrow`, `xarray`, `netCDF4`, `httpx`, and `plotly` (used by `climate_models.py` for server-side figure generation where appropriate).
 
-## Build the cache (run once, and again after any raw data file changes)
+## Build the cache (run once, and again after any raw data file changes or portal URL updates)
 
 ```bash
-~/venvs/hit401_web/bin/python webapp/build_cache.py
+python webapp/build_cache.py
 ```
 
 Takes about 5–15 seconds. Reads, read-only:
@@ -36,14 +36,15 @@ Takes about 5–15 seconds. Reads, read-only:
 - `Datasets/StreamflowData/` (gauge G0280010)
 - `climate/climate_models.py`, imported for its rainfall/flow aggregation logic
 
-Writes compact Parquet/JSON/GeoJSON files to `webapp/cache/` only. Prints a short
-summary and writes `webapp/cache/build_report.json` with every repair, conflict and
-warning found along the way (see "Data findings" below for the highlights).
+Writes compact Parquet/JSON/GeoJSON files to `webapp/cache/` only. Normalises legacy
+NT Water Data Portal domains (`water.nt.gov.au` -> `ntg.aquaticinformatics.net`).
+Prints a short summary and writes `webapp/cache/build_report.json` with every repair,
+conflict and warning found along the way.
 
 ## Run
 
 ```bash
-~/venvs/hit401_web/bin/python webapp/server.py
+python webapp/server.py
 ```
 
 Then open **http://127.0.0.1:8000**. Add `--port 8080` or `--host 0.0.0.0` if needed.
@@ -51,8 +52,8 @@ Then open **http://127.0.0.1:8000**. Add `--port 8080` or `--host 0.0.0.0` if ne
 ## Test
 
 ```bash
-~/venvs/hit401_web/bin/python webapp/tests/test_build_cache.py   # 10 tests, no data files needed
-~/venvs/hit401_web/bin/python webapp/tests/test_api.py           # 32 tests, needs the cache built
+python webapp/tests/test_build_cache.py   # 16 tests, tests ID normalisation & portal URL migration
+python webapp/tests/test_api.py           # 35 tests, needs the cache built
 ```
 
 Both run as plain scripts (same convention as `climate/tests/`) — no pytest installed
@@ -184,6 +185,15 @@ webapp/
   to what's actually on disk (the first omits station 015643, the only one near Ti Tree;
   the second lists 3 rows against 17 real export folders) — this build derives its own
   indices from the source files instead of trusting either.
+- **NT Water Data Portal domain migration (`water.nt.gov.au` -> `ntg.aquaticinformatics.net`)**:
+  Raw groundwater-monitoring layer shapefiles (`Bores_groundwater_level.shp`) contained legacy links
+  using `http(s)://water.nt.gov.au/...`, which the NT Government decommissioned and redirects to a
+  generic disclaimer losing the specific bore or gauge ID. The application converts these links to
+  `https://ntg.aquaticinformatics.net/...` at both cache build time (`build_cache.py`), server
+  startup (`server.py`), and client side (`app.js`), preserving the `/Data/Location/...` path, query
+  parameters, and identifiers, while leaving valid unrelated external links (such as `ntlis.nt.gov.au`
+  bore reports) and records with no portal link untouched. Rebuilding the cache (`python webapp/build_cache.py`)
+  persists these cleaned URLs directly into the on-disk parquet files.
 
 ## Design notes
 

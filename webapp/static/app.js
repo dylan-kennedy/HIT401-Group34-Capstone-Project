@@ -961,11 +961,12 @@ function renderOverviewTab(body, { type, id }, detail) {
   if (detail.overview.bore_report_url) {
     body.appendChild(el("p", {}, [el("a", { href: detail.overview.bore_report_url, target: "_blank" }, "Bore report ↗")]));
   }
-  // GAURAB: rendered as-is from the source shapefile's WATER_DATA field. Some stored
-  // URLs use the old water.nt.gov.au domain instead of ntg.aquaticinformatics.net — see
-  // webapp/README.md "Known gaps". Rewrite the `portal` value here if fixing that.
-  const portal = detail.overview.water_data_portal || detail.overview.monitor_portal_url;
+  // NT Water Data Portal link: supports water_data_portal, monitor_portal_url, or water_data_portal_shp
+  let portal = detail.overview.water_data_portal || detail.overview.monitor_portal_url || detail.overview.water_data_portal_shp;
   if (portal && String(portal).startsWith("http")) {
+    if (portal.includes("water.nt.gov.au")) {
+      portal = portal.replace(/https?:\/\/water\.nt\.gov\.au/i, "https://ntg.aquaticinformatics.net");
+    }
     body.appendChild(el("p", {}, [el("a", { href: portal, target: "_blank" }, "Open in NT Water Data Portal ↗")]));
   }
 }

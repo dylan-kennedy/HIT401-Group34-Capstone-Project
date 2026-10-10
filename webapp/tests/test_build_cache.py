@@ -43,6 +43,44 @@ def test_normalise_id_handles_missing_values():
 
 
 # ---------------------------------------------------------
+# Water Data Portal URL conversion
+# ---------------------------------------------------------
+
+def test_fix_water_data_portal_url_converts_legacy_domain():
+    old = "http://water.nt.gov.au/Data/Location/Summary/Location/RN003532/Interval/Latest"
+    expected = "https://ntg.aquaticinformatics.net/Data/Location/Summary/Location/RN003532/Interval/Latest"
+    assert bc.fix_water_data_portal_url(old) == expected
+
+
+def test_fix_water_data_portal_url_handles_https_and_gauge():
+    old = "https://water.nt.gov.au/Data/Location/Summary/Location/G0060008/Interval/Latest"
+    expected = "https://ntg.aquaticinformatics.net/Data/Location/Summary/Location/G0060008/Interval/Latest"
+    assert bc.fix_water_data_portal_url(old) == expected
+
+
+def test_fix_water_data_portal_url_preserves_query_and_fragment():
+    old = "https://water.nt.gov.au/Data/Location/Summary/Location/RN006543?interval=1#section"
+    expected = "https://ntg.aquaticinformatics.net/Data/Location/Summary/Location/RN006543?interval=1#section"
+    assert bc.fix_water_data_portal_url(old) == expected
+
+
+def test_fix_water_data_portal_url_leaves_already_correct_url():
+    valid = "https://ntg.aquaticinformatics.net/AQWebportal/Data/Location/Summary/Location/RN025286/Interval/Latest"
+    assert bc.fix_water_data_portal_url(valid) == valid
+
+
+def test_fix_water_data_portal_url_leaves_unrelated_domains_alone():
+    report_url = "http://www.ntlis.nt.gov.au/hpa-services/borereport?bore=RN003808"
+    assert bc.fix_water_data_portal_url(report_url) == report_url
+
+
+def test_fix_water_data_portal_url_handles_missing_or_empty():
+    assert bc.fix_water_data_portal_url(None) is None
+    assert bc.fix_water_data_portal_url("") is None
+    assert bc.fix_water_data_portal_url("   ") is None
+
+
+# ---------------------------------------------------------
 # Bores.csv repair — the three malformed shapes actually found in the file
 # (confirmed against the real file in webapp/cache/build_report.json; these are the same
 # three cases reduced to the minimum that reproduces them)

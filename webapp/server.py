@@ -17,6 +17,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 
 import numpy as np
 import pandas as pd
@@ -48,9 +49,36 @@ def _require_cache():
 
 _require_cache()
 
+def fix_water_data_portal_url(value):
+    """Upgrades legacy NT Water Data Portal URLs from the decommissioned
+    water.nt.gov.au host to the official ntg.aquaticinformatics.net host.
+
+    Preserves full path (e.g. /Data/Location/Summary/Location/<ID>/...), query
+    parameters and fragments. Unrelated domains (e.g. ntlis.nt.gov.au bore reports)
+    and already-correct URLs are untouched. Missing/empty values remain None."""
+    if value is None or pd.isna(value):
+        return None
+    text = str(value).strip().strip('"')
+    if not text or not text.startswith("http"):
+        return None
+    try:
+        parsed = urlparse(text)
+    except Exception:
+        return text
+    if parsed.netloc.lower() == "water.nt.gov.au":
+        return urlunparse(parsed._replace(scheme="https", netloc="ntg.aquaticinformatics.net"))
+    return text
+
+
 BORES = pd.read_parquet(CACHE_DIR / "bores.parquet")
 GAUGES = pd.read_parquet(CACHE_DIR / "gauges.parquet")
 MONITORING_BORES = pd.read_parquet(CACHE_DIR / "monitoring_bores.parquet")
+
+BORES["water_data_portal"] = BORES["water_data_portal"].map(fix_water_data_portal_url)
+if "water_data_portal_shp" in BORES.columns:
+    BORES["water_data_portal_shp"] = BORES["water_data_portal_shp"].map(fix_water_data_portal_url)
+MONITORING_BORES["water_data_portal"] = MONITORING_BORES["water_data_portal"].map(fix_water_data_portal_url)
+GAUGES["water_data_portal"] = GAUGES["water_data_portal"].map(fix_water_data_portal_url)
 BOM_STATIONS = pd.read_parquet(CACHE_DIR / "bom_stations.parquet")
 BOM_MONTHLY = pd.read_parquet(CACHE_DIR / "bom_monthly.parquet")
 WQ_SUMMARY = pd.read_parquet(CACHE_DIR / "water_quality_summary.parquet")

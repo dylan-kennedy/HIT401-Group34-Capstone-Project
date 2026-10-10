@@ -315,6 +315,42 @@ def test_water_level_series_returns_statistics_card_data():
 
 
 # ---------------------------------------------------------
+# Water Data Portal URL tests
+# ---------------------------------------------------------
+
+def test_bore_detail_portal_urls_use_aquaticinformatics():
+    resp = client.get("/api/location/bore/RN006543")
+    assert resp.status_code == 200
+    ov = resp.json()["overview"]
+    for field in ("water_data_portal", "water_data_portal_shp", "monitor_portal_url"):
+        val = ov.get(field)
+        if val:
+            assert "water.nt.gov.au" not in val, f"{field} still contains water.nt.gov.au: {val}"
+            assert val.startswith("https://ntg.aquaticinformatics.net/"), f"{field} does not start with new host: {val}"
+    # Bore report URL must remain on ntlis.nt.gov.au
+    assert "ntlis.nt.gov.au" in ov["bore_report_url"]
+
+
+def test_monitoring_only_bore_portal_url_uses_aquaticinformatics():
+    # RN003532 only has monitoring portal URL
+    resp = client.get("/api/location/bore/RN003532")
+    assert resp.status_code == 200
+    ov = resp.json()["overview"]
+    assert ov.get("monitor_portal_url") is not None
+    assert "water.nt.gov.au" not in ov["monitor_portal_url"]
+    assert ov["monitor_portal_url"].startswith("https://ntg.aquaticinformatics.net/")
+
+
+def test_gauge_detail_portal_url_uses_aquaticinformatics():
+    resp = client.get("/api/location/gauge/G0280010")
+    assert resp.status_code == 200
+    ov = resp.json()["overview"]
+    assert ov.get("water_data_portal") is not None
+    assert "water.nt.gov.au" not in ov["water_data_portal"]
+    assert ov["water_data_portal"].startswith("https://ntg.aquaticinformatics.net/")
+
+
+# ---------------------------------------------------------
 # static page
 # ---------------------------------------------------------
 
