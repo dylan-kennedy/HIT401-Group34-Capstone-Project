@@ -137,18 +137,14 @@ webapp/
 
 ## Known gaps / planned work
 
-- **No automatic data download.** `build_cache.py` is a human-triggered preprocessing
+- **No automatic external data download.** `build_cache.py` is a human-triggered preprocessing
   step; nothing in this app downloads or refreshes source data on its own.
   `climate/download_cmip6_pr.py` exists as a separate manual script for the CMIP6 data
   specifically, also not wired into any UI.
-- **CSV download for the compare tray is planned, not built.** Every single-location
-  chart has a CSV download already; the multi-bore compare overlay (`openCompareView`
-  in `app.js`) does not yet.
-- **The NT Water Data Portal link may point to the old domain for some bores.** This
-  app renders whatever URL is in the source shapefile's `WATER_DATA` field as-is
-  (`water_data_portal` / `water_data_portal_shp` / `monitor_portal_url` in
-  `build_cache.py` and `server.py`); some of those stored URLs use the old
-  `water.nt.gov.au` domain instead of `ntg.aquaticinformatics.net`. Not rewritten here.
+- *(Resolved)* **Multi-bore comparison CSV download**: Implemented in `openCompareView`
+  with dedicated "Download data (CSV)" buttons for water quality, water level, and combined series.
+- *(Resolved)* **NT Water Data Portal URL migration**: Normalized at build and load time
+  to `https://ntg.aquaticinformatics.net` preserving paths, query strings, and bore IDs.
 
 ## Data findings (see `webapp/cache/build_report.json` for the complete, generated list)
 

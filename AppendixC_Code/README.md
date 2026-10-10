@@ -16,32 +16,39 @@ Group members: Dylan Kennedy, Gaurab Gaihre, Krishna Dhakal, Sachin Kharel.
 | `toolkit_demo.py` | `toolkit_demo.png` — the four core analysis functions validated on synthetic data with known answers | Section V, toolkit validation |
 | `README.md` | this file | Appendix C |
 
-## 2. Input data — not redistributed here
+## 2. Input data and repository datasets
 
-The analysis reads the folder **`GroundwaterHeads_20250718`**, shared by Dr Cat Kutay
-on 6 August 2026 and prepared by Assoc. Prof. Dylan Irvine. It contains water-level
-records for 16 unique bores (17 subfolders — RN006543 is exported twice) in the
-**Ti Tree Basin, Northern Territory**, comprising 60 CSV exports and 711,627
-measurements (706,752 Publish, 4,875 Field Visits) spanning 21 February 1967 to
-12 December 2024. `gwrc_ingest.py` de-duplicates RN006543's repeated
-LocationExport folder — the two folders hold identical data — by skipping a
-folder once its bore ID has already been ingested; without this, the printed
-measurement total is inflated by 92,272 records (one folder's worth) even
-though the unique-bore and series counts are unaffected.
+The groundwater time-series analysis reads the folder **`Datasets/GroundwaterHeads_20250718/`**,
+shared by Dr Cat Kutay on 6 August 2026 and prepared by Assoc. Prof. Dylan Irvine. It is
+included in this repository under the `Datasets/` directory.
 
-That folder is **not included in this submission**: it was supplied privately by the
-client and is not ours to redistribute. Markers with access can point the scripts at
-their own copy. Each per-bore subfolder contains up to four exports —
-`Depth Below Ground` and `Water Elevation (AHD)`, each as a `Field Visits` series
-(manual dip measurements) and a `Publish` series (approved, largely logger-derived).
+It contains water-level records for 16 unique bores (17 LocationExport subfolders — RN006543
+has duplicate export folders from 2025-07-18) in the **Ti Tree Basin, Northern Territory**,
+comprising 60 CSV exports and 711,627 measurements (706,752 Publish, 4,875 Field Visits)
+spanning 21 February 1967 to 12 December 2024. `gwrc_ingest.py` de-duplicates RN006543's repeated
+LocationExport folder — the two folders hold identical data — by skipping a folder once its
+bore ID has already been ingested; without this, the printed measurement total is inflated by
+92,272 records (one folder's worth) even though the unique-bore and series counts are unaffected.
 
-Secondary public source (not required to run the scripts):
-NT Government bore locations, water quality and groundwater levels,
-`https://data.nt.gov.au/dataset/nt-bore-locations-water-quality-and-groundwater-levels`
+Each per-bore subfolder contains up to four exports: `Depth Below Ground` and `Water Elevation (AHD)`,
+each as a `Field Visits` series (manual dip measurements) and a `Publish` series (approved,
+telemetry/logger-derived).
+
+### Dataset Scope in the Repository:
+- **Included in repository**:
+  * `Datasets/GroundwaterHeads_20250718/`: Water-level time series for 16 Ti Tree monitoring bores (60 CSV exports).
+  * `Datasets/NT-NaturalResourceMapsBoreData/Bores.csv`: Comprehensive NT bore register with 43,099 bore records.
+  * `krishna-code/data.zip`: Spatial GIS layers including `Bores.shp`, `Bores_groundwater_level.shp` (2,274 monitoring bores + 131 stream gauges), `Bores_water_quality.shp` (84,769 samples across 16,929 bores NT-wide), and Ti Tree aquifer boundary/contour layers.
+  * `Datasets/StreamflowData/`: Streamflow discharge series for gauge G0280010 (Woodforde River at Arden Soak).
+  * `Datasets/BOM-Datasets/`: Daily rainfall records for 11 weather stations (including Ti Tree Territory Grape Farm 015643 and Darwin Fort Hill Wharf 014050).
+- **Missing / External (not in repository)**:
+  * Licensed pumping and groundwater extraction records (held privately or by regulatory authorities; not redistributed).
+  * Discharge records for river gauges other than G0280010.
+  * Drawdown and stream-aquifer connectivity functions in `toolkit_demo.py` use synthetically generated test cases with known analytical solutions.
 
 ## 3. Environment
 
-Developed and tested on Python 3.11+ with:
+Developed and tested on Python 3.11+ / 3.12 with:
 
 ```
 pandas >= 2.0
@@ -58,18 +65,28 @@ pip install pandas numpy scipy matplotlib
 
 ## 4. Steps to execute
 
+From the `AppendixC_Code/` directory:
+
 ```bash
 # 1. Normalise the supplied exports and run the data-quality audit
-python3 gwrc_ingest.py /path/to/GroundwaterHeads_20250718
+python gwrc_ingest.py ../Datasets/GroundwaterHeads_20250718
 #    -> writes gwrc_tidy.csv and prints defects (a)-(d) from Section IV
 
 # 2. Trend and completeness analysis, and the report figures
-python3 gwrc_trends.py gwrc_tidy.csv
+python gwrc_trends.py gwrc_tidy.csv
 #    -> writes gwrc_trend_results.csv and gwrc_trends.png
 
 # 3. Validate the four core analysis functions against synthetic test cases
-python3 toolkit_demo.py
+python toolkit_demo.py
 #    -> writes toolkit_demo.png
+```
+
+Or from the repository root:
+
+```bash
+python AppendixC_Code/gwrc_ingest.py Datasets/GroundwaterHeads_20250718
+python AppendixC_Code/gwrc_trends.py gwrc_tidy.csv
+python AppendixC_Code/toolkit_demo.py
 ```
 
 ## 5. Method notes

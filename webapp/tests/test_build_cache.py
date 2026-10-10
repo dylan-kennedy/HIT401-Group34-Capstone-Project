@@ -15,6 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))       # webapp/
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "climate"))  # climate/
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))  # repo root
 
 import build_cache as bc
 import climate_models as cm

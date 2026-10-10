@@ -1244,24 +1244,75 @@ async function openCompareView() {
   const body = document.getElementById("drawer-body");
   body.innerHTML = "";
 
+  // Track currently loaded comparison rows for on-demand CSV downloads
+  let currentWQRows = [];
+  let currentWLRows = [];
+
+  const topActions = el("div", { class: "chart-actions", style: "margin-bottom: 16px;" });
+  topActions.appendChild(el("button", {
+    id: "btn-compare-download-all",
+    class: "inline-action-btn",
+    style: "font-weight: 500;",
+    title: "Download data (CSV) for all displayed comparison series",
+    onclick: () => {
+      const combined = [
+        ...currentWQRows.map((r) => ({
+          date: r.sample_date, bore_no: r.bore_no,
+          dataset: "Water Quality", measurement: r.parameter, value: r.value, unit: "",
+        })),
+        ...currentWLRows.map((r) => ({
+          date: r.month, bore_no: r.bore_no,
+          dataset: "Water Level", measurement: `${r.measurement} (${r.series})`, value: r.value_m_ahd, unit: "m AHD",
+        })),
+      ];
+      if (combined.length) {
+        downloadCSV(`compare_bores_${state.compareIds.join("_")}.csv`, combined);
+      } else {
+        alert("No comparison data available to download.");
+      }
+    },
+  }, "Download data (CSV)"));
+  body.appendChild(topActions);
+
   body.appendChild(el("h3", {}, "Compare: water quality"));
   const paramSelect = el("select", {}, state.meta.measurements.names.map((name, i) =>
     el("option", { value: state.meta.measurements.columns[i] }, name)));
   body.appendChild(paramSelect);
   const wqChart = el("div", { id: "cmp-wq-chart", class: "chart" });
   body.appendChild(wqChart);
+  const wqActions = el("div", { class: "chart-actions", id: "cmp-wq-actions" });
+  body.appendChild(wqActions);
 
   async function drawWQ() {
     showLoading(true);
     try {
       const param = paramSelect.value;
       const traces = [];
-      const rowsByDate = {};
+      const rows = [];
       for (const boreId of state.compareIds) {
         const data = await fetchJSON(`/api/water-quality/${boreId}`, { parameter: param });
         traces.push({ x: data.dates, y: data.values, mode: "lines+markers", name: boreId, line: { color: state.compareColours[boreId] } });
+        for (let i = 0; i < data.dates.length; i++) {
+          rows.push({
+            sample_date: data.dates[i],
+            bore_no: boreId,
+            parameter: param,
+            value: data.values[i],
+          });
+        }
       }
+      rows.sort((a, b) => a.sample_date.localeCompare(b.sample_date) || a.bore_no.localeCompare(b.bore_no));
+      currentWQRows = rows;
       Plotly.newPlot("cmp-wq-chart", traces, { ...plotlyTheme(), margin: { t: 20, r: 10, l: 50, b: 40 }, yaxis: { title: param }, legend: { orientation: "h" } }, { displaylogo: false, responsive: true });
+
+      wqActions.innerHTML = "";
+      wqActions.appendChild(el("button", {
+        onclick: () => Plotly.downloadImage("cmp-wq-chart", { format: "png", filename: `compare_water_quality_${param}`, width: 1200, height: 600, scale: 2 }),
+      }, "Download PNG"));
+      wqActions.appendChild(el("button", {
+        id: "btn-download-compare-wq-csv",
+        onclick: () => downloadCSV(`compare_water_quality_${param}.csv`, currentWQRows),
+      }, "Download data (CSV)"));
     } finally { showLoading(false); }
   }
   paramSelect.addEventListener("change", drawWQ);
@@ -1270,26 +1321,42 @@ async function openCompareView() {
   body.appendChild(el("h3", {}, "Compare: water level (monthly mean, Water Elevation AHD, Publish where available)"));
   const wlChart = el("div", { id: "cmp-wl-chart", class: "chart" });
   body.appendChild(wlChart);
+  const wlActions = el("div", { class: "chart-actions", id: "cmp-wl-actions" });
+  body.appendChild(wlActions);
+
   const traces = [];
+  const rows = [];
   for (const boreId of state.compareIds) {
     try {
       const data = await fetchJSON(`/api/water-level/${boreId}`, { kind: "water_elevation_ahd", series: "publish" });
       traces.push({ x: data.months, y: data.values, mode: "lines+markers", name: boreId, connectgaps: false, line: { color: state.compareColours[boreId] } });
+      for (let i = 0; i < data.months.length; i++) {
+        rows.push({
+          month: data.months[i],
+          bore_no: boreId,
+          measurement: "Water Elevation (AHD)",
+          series: "Publish",
+          value_m_ahd: data.values[i],
+        });
+      }
     } catch (e) { /* this bore has no such series — simply not plotted */ }
   }
+  rows.sort((a, b) => a.month.localeCompare(b.month) || a.bore_no.localeCompare(b.bore_no));
+  currentWLRows = rows;
+
   if (traces.length) {
     Plotly.newPlot("cmp-wl-chart", traces, { ...plotlyTheme(), margin: { t: 20, r: 10, l: 50, b: 40 }, yaxis: { title: "m AHD" }, legend: { orientation: "h" } }, { displaylogo: false, responsive: true });
+    wlActions.innerHTML = "";
+    wlActions.appendChild(el("button", {
+      onclick: () => Plotly.downloadImage("cmp-wl-chart", { format: "png", filename: "compare_water_level_ahd", width: 1200, height: 600, scale: 2 }),
+    }, "Download PNG"));
+    wlActions.appendChild(el("button", {
+      id: "btn-download-compare-wl-csv",
+      onclick: () => downloadCSV("compare_water_level_ahd.csv", currentWLRows),
+    }, "Download data (CSV)"));
   } else {
     wlChart.innerHTML = "<p class='empty-state'>None of the selected bores have a Water Elevation (AHD) Publish series.</p>";
   }
-
-  // GAURAB: a "Download data (CSV)" button for the whole comparison (all selected
-  // bores' series together, not just one chart's PNG via the Plotly toolbar) is planned
-  // here — see webapp/README.md "Known gaps". Each chart above (#cmp-wq-chart,
-  // #cmp-wl-chart) already has its data in `traces`/the per-bore fetch results in this
-  // function if you want to build the CSV from what's already loaded rather than
-  // re-fetching. closeDrawerPanel() (near the top-level drawer-close listener) is what
-  // runs when this view is closed — it already knows to come back here via panelMode.
 }
 
 // ---------------------------------------------------------------------------

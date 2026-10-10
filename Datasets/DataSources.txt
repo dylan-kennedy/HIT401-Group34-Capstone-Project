@@ -1,23 +1,72 @@
-"GroundwaterHeads_20250718" - Shared by supervisor Dr Cat Kutay via email with the team. - Note: This data is now technically outdated but not by much, it's from April 2025 I think. 
+================================================================================
+HIT401 Group 34 Capstone Project — Dataset Provenance and Sources
+================================================================================
 
-"Bores.csv" inside "NT-NaturalResourceMapsBoreData" - Can be downloaded directly through Northern Territory's Natural Resource Maps website (at https://nrmaps.nt.gov.au/nrmaps.html), but the current version 4/09/26 was provided via email exchange between Group 34, supervisor Dr Cat Kutay, and Associate Professor Dylan Irvine, by Dylan.
+1. "GroundwaterHeads_20250718"
+   - Provenance: Shared by project supervisor Dr Cat Kutay on 6 August 2026,
+     prepared by Assoc. Prof. Dylan Irvine (Charles Darwin University).
+   - Contents: Groundwater level records for 16 unique monitoring bores in the
+     Ti Tree Basin, Northern Territory (17 LocationExport folders — bore RN006543
+     has two export folders from 2025-07-18).
+   - Record count: 60 CSV time-series exports containing 711,627 measurements
+     (706,752 Publish logger readings and 4,875 Field Visits manual dip readings)
+     spanning 21 February 1967 to 12 December 2024.
+   - Variables: "Depth Below Ground (m)" and "Water Elevation (m AHD)".
 
-"BOM-Datasets" - Provided by supervisor, but can and likely will be updated by location from the source at the BOM website: https://www.bom.gov.au/climate/data/ 
+2. "NT-NaturalResourceMapsBoreData/Bores.csv"
+   - Provenance: Provided via email exchange with Assoc. Prof. Dylan Irvine;
+     downloadable directly from the Northern Territory Natural Resource Maps portal
+     (NR Maps NT: https://nrmaps.nt.gov.au/nrmaps.html).
+   - Contents: Complete NT-wide bore register containing 43,099 bore records.
+     Attributes include bore number (Bore no), name, depth, yield, completion
+     date, static water level, drilling purpose, construction status, coordinates
+     (latitude, longitude, UTM easting/northing), and official NTLIS bore report URLs.
+   - Data cleaning note: 10 lines in Bores.csv contain stray unescaped quotation
+     marks inside bore names (e.g. line 930: 'MCMAHONS 6"CAS 72K E OF 3/WAYS',
+     where the inch symbol '"' breaks naive CSV parsers into 19 or 20 columns).
+     The webapp cache builder (webapp/build_cache.py) reconstructs and repairs all
+     10 occurrences rather than dropping data.
 
+3. "BOM-Datasets"
+   - Provenance: Provided by supervisor, sourced from the Australian Bureau of
+     Meteorology (BOM) Climate Data Online (https://www.bom.gov.au/climate/data/).
+   - Geographic Coverage & Actual Stations:
+     Contrary to an early assumption that this folder only contained Perth data,
+     the folder actually contains daily rainfall data (Data.csv) and station notes
+     (Note.txt) for 11 BOM weather stations across Australia, including 2 Northern
+     Territory stations:
+       * 015643: TERRITORY GRAPE FARM (NT) — Lat: -22.45°, Lon: 133.64°, opened 1987.
+         Located within the Ti Tree Basin study area (~42 km from central Ti Tree);
+         serves as the primary observed rainfall record for Ti Tree climate and recharge models.
+       * 014050: FORT HILL WHARF (NT) — Lat: -12.47°, Lon: 130.85°, opened 1882.
+         Located at Darwin Harbour; provides Top End tropical rainfall context.
+     Plus 9 interstate stations included for comparative climate context:
+       * 009021: PERTH AIRPORT (WA) — Lat: -31.93°, Lon: 115.98°
+       * 010558: GNOWANGERUP (WA) — Lat: -33.94°, Lon: 118.01°
+       * 023055: ADELAIDE AIRPORT ALERT (SA) — Lat: -34.95°, Lon: 138.52°
+       * 031049: MULGRAVE MILL (QLD) — Lat: -17.09°, Lon: 145.79°
+       * 033307: WOOLSHED (QLD) — Lat: -19.42°, Lon: 146.54°
+       * 040913: BRISBANE (QLD) — Lat: -27.48°, Lon: 153.04°
+       * 066006: SYDNEY BOTANIC GARDENS (NSW) — Lat: -33.87°, Lon: 151.22°
+       * 086282: MELBOURNE AIRPORT (VIC) — Lat: -37.67°, Lon: 144.83°
+       * 094029: HOBART (ELLERSLIE ROAD) (TAS) — Lat: -42.89°, Lon: 147.33°
 
-Note: Current "BOM-Datasets" data is actually from Perth Airport (M.O) - Station num 9021, opened 1944, still open, Lat 31.93 deg S, Lon 115.98 deg E, 15m Elevation
-- Source & Maybe replace this data, or move inside a folder by state (e.g. Perth\(the datasets in csv + associated .txt files))
+4. "StreamflowData"
+   - Provenance: Sourced from the Northern Territory Government Water Data Portal
+     (NTG Aquatic Informatics).
+   - Contents: Continuous river discharge data for station G0280010 (Woodforde
+     River at Arden Soak), the primary gauged river crossing relevant to the
+     Ti Tree groundwater basin. Includes daily discharge volume (ML/day) and
+     BOM/NT water quality code ratings.
 
-Closest Ti-Tree available data = 015643 Territory Grape Farm NT (42.0km away) - Maybe use this for now as we focus on Ti-Tree area. Test with existing Perth data first I guess.
-
-Error in Line 930 of Bores.csv - an exta " is in the line ("MCMAHONS 6"CAS 72K E OF 3/WAYS) meaning a , is assumed as end of data so 19 cols instead of 18.
-
-"pandas.errors.ParserError: Error tokenizing data. C error: Expected 18 fields in line 930, saw 19"
-
-Multiple occurrances though so need to change how the csv is read
-
-Strip the CSV of the "", pandas dataframe ends up as this so the errors begin at looking for "Bore no" instead of -> Bore no
-
-['"Bore no"', '"Name"', '"Bore report"', '"Yield (L/s)"', '"Completion date"', '"Drilled depth (m)"', '"Completion depth (m)"', '"Depth to water (m) at date of drilling"', '"Purpose"', '"Construction"', '"Status"', '"Latitude"', '"Longitude"', '"UTM zone"', '"Easting"', '"Northing"', '"Position accuracy"', '"Water data portal"']
-
-# Note - Maybe remove this file in future, move info to readme?
+5. "krishna-code/data.zip" (Spatial Layers & Hydrochemistry)
+   - Provenance: Packaged by Krishna Dhakal for exploratory geospatial dashboards,
+     sourced from the NT Department of Environment, Parks and Water Security GIS layers.
+   - Contents:
+     * nt_bores/Bores.shp: Spatial shapefile of bores across the NT.
+     * nt_bores/Bores_groundwater_level.shp: Monitoring layer containing 2,274 groundwater
+       monitoring bore locations and 131 streamflow gauges across the NT.
+     * nt_bores/Bores_water_quality.shp: Comprehensive NT-wide water quality dataset
+       containing 84,769 chemical samples across 16,929 bores (1909–2021).
+     * ti_tree/data/: Ti Tree aquifer spatial layers including basin boundary,
+       groundwater salinity, aquifer thickness, depth to groundwater, and water level contours.
