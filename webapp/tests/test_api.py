@@ -213,6 +213,65 @@ def test_climate_unknown_location_is_400_not_500():
     assert resp.status_code == 400
 
 
+def test_climate_seasonal_ti_tree_has_observed_and_models():
+    resp = client.get("/api/climate/seasonal", params={"location": "Ti Tree"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["observed"] is not None
+    assert len(data["observed"]["years"]) > 0
+    assert len(data["observed"]["wet"]) == len(data["observed"]["years"])
+    assert len(data["models"]) > 0
+    assert data["figure"] is not None
+
+
+def test_climate_seasonal_darwin_handles_missing_observed():
+    resp = client.get("/api/climate/seasonal", params={"location": "Darwin"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["observed"] is None
+    assert len(data["models"]) > 0
+
+
+def test_climate_lag_rainfall_returns_correlations():
+    resp = client.get("/api/climate/lag", params={"driver": "rainfall"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["driver"] == "Rainfall"
+    assert len(data["lags"]) == data["max_lag"] + 1
+    assert len(data["r"]) == len(data["lags"])
+    assert data["figure"] is not None
+
+
+def test_climate_lag_flow_returns_correlations():
+    resp = client.get("/api/climate/lag", params={"driver": "flow"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["driver"] == "River flow"
+    assert len(data["lags"]) == data["max_lag"] + 1
+
+
+def test_climate_lag_unknown_driver_is_400():
+    resp = client.get("/api/climate/lag", params={"driver": "invalid_driver"})
+    assert resp.status_code == 400
+
+
+def test_climate_lag_unknown_bore_is_404():
+    resp = client.get("/api/climate/lag", params={"bore_id": "RN9999999"})
+    assert resp.status_code == 404
+
+
+def test_climate_rain_flow_bores_returns_figure_and_rows():
+    resp = client.get("/api/climate/rain-flow-bores", params={"start": "2010-01"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["bores"]) > 0
+    assert data["figure"] is not None
+    assert len(data["rows"]) > 0
+    assert "month" in data["rows"][0]
+    assert "rainfall_total_mm" in data["rows"][0]
+    assert "flow_total_ML" in data["rows"][0]
+
+
 # ---------------------------------------------------------
 # static page
 # ---------------------------------------------------------

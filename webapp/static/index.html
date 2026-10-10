@@ -206,6 +206,51 @@
         <button class="btn-download-png" data-target="climate-flow-residual-chart" data-name="flow_residual_mass">Download PNG</button>
         <button class="btn-download-csv" id="btn-csv-flow-residual">Download CSV</button>
       </div>
+
+      <h3>Seasonal recharge: observed vs modelled</h3>
+      <p class="caption">In the Ti Tree region, groundwater recharge is dominated by the summer monsoon wet season (Nov–Apr). This chart compares observed wet- and dry-season rainfall totals from the Territory Grape Farm gauge (015643) with CMIP6 climate model projections. Outlined bars indicate seasons with missing gauge data.</p>
+      <div class="climate-controls-row">
+        <label><input type="checkbox" id="climate-season-future"> Show model projections out to 2099 (default: through 2025)</label>
+      </div>
+      <div id="climate-seasonal-caption" class="caption"></div>
+      <div id="climate-seasonal-chart" class="chart"></div>
+      <div class="chart-actions">
+        <button class="btn-download-png" data-target="climate-seasonal-chart" data-name="seasonal_recharge">Download PNG</button>
+        <button class="btn-download-csv" id="btn-csv-seasonal">Download CSV</button>
+      </div>
+
+      <h3>Rainfall, river flow, and bore water levels (2010 onwards)</h3>
+      <p class="caption">Three-panel time-series comparison over the telemetry record: rainfall residual mass at Territory Grape Farm (015643), Woodforde River flow residual mass at Arden Soak (G0280010), and water elevations (m AHD) in monitoring bores. Gaps in bore records are left open.</p>
+      <div id="climate-timeseries-caption" class="caption"></div>
+      <div id="climate-timeseries-chart" class="chart chart-tall"></div>
+      <div class="chart-actions">
+        <button class="btn-download-png" data-target="climate-timeseries-chart" data-name="rain_flow_bores">Download PNG</button>
+        <button class="btn-download-csv" id="btn-csv-timeseries">Download CSV</button>
+      </div>
+
+      <h3>Lag correlation: rainfall and river flow vs bore water levels</h3>
+      <p class="caption">Investigating how long after rainfall or river flow the water table responds. Compares monthly rainfall or river flow anomaly (seasonal cycle removed) against month-to-month change in bore water levels (m) across lags from 0 to 12 months. Only lags with ≥24 paired months are considered reliable findings.</p>
+      <div class="climate-controls-row">
+        <label for="climate-lag-bore">Bore:</label>
+        <select id="climate-lag-bore"></select>
+        <label for="climate-lag-driver">Compare against:</label>
+        <select id="climate-lag-driver">
+          <option value="rainfall">Rainfall anomaly (015643)</option>
+          <option value="flow">River flow anomaly (G0280010)</option>
+        </select>
+        <label for="climate-lag-max">Max lag:</label>
+        <select id="climate-lag-max">
+          <option value="12">12 months</option>
+          <option value="6">6 months</option>
+          <option value="24">24 months</option>
+        </select>
+      </div>
+      <div id="climate-lag-caption" class="caption"></div>
+      <div id="climate-lag-chart" class="chart"></div>
+      <div class="chart-actions">
+        <button class="btn-download-png" data-target="climate-lag-chart" data-name="lag_correlations">Download PNG</button>
+        <button class="btn-download-csv" id="btn-csv-lag">Download CSV</button>
+      </div>
     </div>
   </div>
 

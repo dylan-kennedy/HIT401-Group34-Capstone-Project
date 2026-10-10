@@ -125,6 +125,7 @@ function initTheme() {
     document.documentElement.setAttribute("data-theme", next);
     try { localStorage.setItem("theme", next); } catch (e) { /* ignore */ }
     refreshAllMarkerColours();
+    window.dispatchEvent(new Event("themechange"));
   });
 }
 
@@ -836,6 +837,26 @@ async function renderWaterLevelTab(body, { id }, detail) {
   }
   select.addEventListener("change", draw);
   await draw();
+
+  const lagBtn = el("button", {
+    class: "inline-action-btn",
+    style: "margin-top: 10px; font-size: 13px; cursor: pointer; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text);",
+    onclick: () => {
+      setView("climate");
+      const boreSelect = document.getElementById("climate-lag-bore");
+      if (boreSelect) {
+        let found = false;
+        for (const opt of boreSelect.options) {
+          if (opt.value === id) { opt.selected = true; found = true; break; }
+        }
+        if (!found) {
+          boreSelect.appendChild(el("option", { value: id, selected: true }, id));
+        }
+        boreSelect.dispatchEvent(new Event("change"));
+      }
+    }
+  }, `Investigate lag correlation for ${id} in Climate view →`);
+  body.appendChild(lagBtn);
 }
 
 async function renderWaterQualityTab(body, { id }, detail) {
@@ -1096,6 +1117,11 @@ async function openCompareView() {
 async function initClimateView() {
   const locationSelect = document.getElementById("climate-location");
   const runSelect = document.getElementById("climate-run");
+  const seasonFutureCheckbox = document.getElementById("climate-season-future");
+  const lagBoreSelect = document.getElementById("climate-lag-bore");
+  const lagDriverSelect = document.getElementById("climate-lag-driver");
+  const lagMaxSelect = document.getElementById("climate-lag-max");
+
   const meta = await fetchJSON("/api/climate/meta");
   if (!meta.available) {
     document.getElementById("climate-body").innerHTML = `<p class="empty-state">${meta.message}</p>`;
@@ -1112,6 +1138,7 @@ async function initClimateView() {
     runSelect.selectedIndex = preferred >= 0 ? preferred : 0;
     await drawAnomaly();
     await drawWetterDrier();
+    await drawSeasonal();
   }
 
   async function drawAnomaly() {
@@ -1160,8 +1187,166 @@ async function initClimateView() {
          legend: { orientation: "h" } }, { displaylogo: false, responsive: true });
   }
 
+  async function drawSeasonal() {
+    const loc = locationSelect.value;
+    const future = seasonFutureCheckbox.checked;
+    const captionEl = document.getElementById("climate-seasonal-caption");
+    const chartEl = document.getElementById("climate-seasonal-chart");
+    try {
+      showLoading(true);
+      const data = await fetchJSON("/api/climate/seasonal", { location: loc, to_2099: future });
+      captionEl.textContent = data.footnote;
+
+      const dark = document.documentElement.getAttribute("data-theme") === "dark";
+      if (data.figure) {
+        const layout = { ...data.figure.layout, ...plotlyTheme() };
+        if (dark) {
+          if (layout.xaxis) { layout.xaxis.gridcolor = "#35393d"; layout.xaxis.linecolor = "#888"; }
+          if (layout.yaxis) { layout.yaxis.gridcolor = "#35393d"; layout.yaxis.linecolor = "#888"; }
+        }
+        Plotly.newPlot("climate-seasonal-chart", data.figure.data, layout, { displaylogo: false, responsive: true });
+      } else if (data.models && Object.keys(data.models).length) {
+        const traces = [];
+        const palette = ["#1B6CA8", "#C2567A", "#4F8F3A", "#6BA4CF"];
+        let idx = 0;
+        for (const [runName, mod] of Object.entries(data.models)) {
+          traces.push({
+            x: mod.years, y: mod.wet, mode: "lines", name: `${runName} wet season`,
+            line: { color: palette[idx % palette.length], width: 1.5 }
+          });
+          idx++;
+        }
+        Plotly.newPlot("climate-seasonal-chart", traces, {
+          ...plotlyTheme(), title: data.title,
+          xaxis: { title: "Season start year", dtick: 5 }, yaxis: { title: "Rainfall (mm)" },
+          margin: { t: 50, r: 20, l: 60, b: 40 },
+          legend: { orientation: "h", x: 0.01, y: 1.05 }
+        }, { displaylogo: false, responsive: true });
+      } else {
+        chartEl.innerHTML = "<p class='empty-state'>No seasonal rainfall data available for this location.</p>";
+      }
+
+      const allYears = new Set();
+      if (data.observed) data.observed.years.forEach((y) => allYears.add(y));
+      if (data.models) {
+        Object.values(data.models).forEach((m) => m.years.forEach((y) => allYears.add(y)));
+      }
+      const sortedYears = Array.from(allYears).sort((a, b) => a - b);
+      state._seasonalRows = sortedYears.map((y) => {
+        const row = { season_start_year: y };
+        if (data.observed) {
+          const obsIdx = data.observed.years.indexOf(y);
+          row.observed_wet_mm = obsIdx >= 0 ? data.observed.wet[obsIdx] : null;
+          row.observed_wet_missing_months = obsIdx >= 0 ? data.observed.wet_missing[obsIdx] : null;
+          row.observed_dry_mm = obsIdx >= 0 ? data.observed.dry[obsIdx] : null;
+          row.observed_dry_missing_months = obsIdx >= 0 ? data.observed.dry_missing[obsIdx] : null;
+        }
+        if (data.models) {
+          Object.entries(data.models).forEach(([runName, mod]) => {
+            const mIdx = mod.years.indexOf(y);
+            row[`model_${runName}_wet_mm`] = mIdx >= 0 ? mod.wet[mIdx] : null;
+          });
+        }
+        return row;
+      });
+    } catch (e) {
+      chartEl.innerHTML = `<p class='empty-state'>Could not load seasonal chart: ${e.message}</p>`;
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  async function drawTimeseries() {
+    const captionEl = document.getElementById("climate-timeseries-caption");
+    const chartEl = document.getElementById("climate-timeseries-chart");
+    try {
+      showLoading(true);
+      const data = await fetchJSON("/api/climate/rain-flow-bores", { start: "2010-01" });
+      captionEl.textContent = data.caption;
+      const dark = document.documentElement.getAttribute("data-theme") === "dark";
+      const layout = { ...data.figure.layout, ...plotlyTheme(), height: 720 };
+      if (dark) {
+        ['xaxis', 'xaxis2', 'xaxis3', 'yaxis', 'yaxis2', 'yaxis3', 'yaxis4'].forEach((ax) => {
+          if (layout[ax]) {
+            layout[ax].gridcolor = "#35393d";
+            layout[ax].linecolor = "#777777";
+          }
+        });
+      }
+      Plotly.newPlot("climate-timeseries-chart", data.figure.data, layout, { displaylogo: false, responsive: true });
+      state._timeseriesRows = data.rows;
+    } catch (e) {
+      chartEl.innerHTML = `<p class='empty-state'>Could not load time-series comparison: ${e.message}</p>`;
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  let lagBoresInitialised = false;
+  async function drawLag() {
+    const captionEl = document.getElementById("climate-lag-caption");
+    const chartEl = document.getElementById("climate-lag-chart");
+    try {
+      showLoading(true);
+      const params = {
+        bore_id: lagBoreSelect.value || undefined,
+        driver: lagDriverSelect.value,
+        max_lag: lagMaxSelect.value,
+      };
+      const data = await fetchJSON("/api/climate/lag", params);
+
+      if (!lagBoresInitialised && data.available_bores && data.available_bores.length) {
+        lagBoreSelect.innerHTML = "";
+        data.available_bores.forEach((b) => lagBoreSelect.appendChild(el("option", { value: b }, b)));
+        lagBoreSelect.value = data.bore_id;
+        lagBoresInitialised = true;
+      }
+
+      captionEl.textContent = (data.best_lag !== null
+        ? `Strongest correlation: lag ${data.best_lag} months (r = ${data.best_r.toFixed(2)}, n = ${data.best_n} paired months). `
+        : "") + data.footnote;
+
+      const dark = document.documentElement.getAttribute("data-theme") === "dark";
+      if (data.figure) {
+        const layout = { ...data.figure.layout, ...plotlyTheme() };
+        if (dark) {
+          if (layout.xaxis) { layout.xaxis.gridcolor = "#35393d"; layout.xaxis.linecolor = "#888"; }
+          if (layout.yaxis) { layout.yaxis.gridcolor = "#35393d"; layout.yaxis.linecolor = "#888"; }
+        }
+        Plotly.newPlot("climate-lag-chart", data.figure.data, layout, { displaylogo: false, responsive: true });
+      } else {
+        const colors = data.r.map((v) => (v !== null && v >= 0 ? data.wetter_color : data.drier_color));
+        Plotly.newPlot("climate-lag-chart", [{
+          x: data.lags, y: data.r, type: "bar", marker: { color: colors },
+          customdata: data.n_months,
+          hovertemplate: "Lag %{x} months<br>r = %{y:.3f}<br>%{customdata} paired months<extra></extra>"
+        }], {
+          ...plotlyTheme(), title: data.title,
+          xaxis: { title: "Lag (months)", dtick: 1 }, yaxis: { title: "Correlation (Pearson r)" },
+          margin: { t: 50, r: 20, l: 60, b: 40 }
+        }, { displaylogo: false, responsive: true });
+      }
+
+      state._lagRows = data.lags.map((lag, i) => ({
+        bore_id: data.bore_id,
+        driver: data.driver,
+        lag_months: lag,
+        r: data.r[i],
+        n_paired_months: data.n_months[i],
+      }));
+    } catch (e) {
+      chartEl.innerHTML = `<p class='empty-state'>Could not load lag correlations: ${e.message}</p>`;
+    } finally {
+      showLoading(false);
+    }
+  }
+
   locationSelect.addEventListener("change", refreshRuns);
   runSelect.addEventListener("change", async () => { await drawAnomaly(); });
+  seasonFutureCheckbox.addEventListener("change", async () => { await drawSeasonal(); });
+  lagBoreSelect.addEventListener("change", async () => { await drawLag(); });
+  lagDriverSelect.addEventListener("change", async () => { await drawLag(); });
+  lagMaxSelect.addEventListener("change", async () => { await drawLag(); });
 
   document.getElementById("btn-csv-anomaly").addEventListener("click", () => downloadCSV("anomaly.csv", state._anomalyRows));
   document.getElementById("btn-csv-wetter").addEventListener("click", () => downloadCSV("wetter_or_drier.csv", state._wetterRows));
@@ -1173,13 +1358,36 @@ async function initClimateView() {
     const data = await fetchJSON("/api/flow");
     downloadCSV("flow_residual_mass.csv", arraysToRows("month", data.months, { total_ML: data.total_ML, cumulative_residual_ML: data.cumulative_residual_ML }));
   });
+  document.getElementById("btn-csv-seasonal").addEventListener("click", () => downloadCSV("seasonal_recharge.csv", state._seasonalRows));
+  document.getElementById("btn-csv-timeseries").addEventListener("click", () => downloadCSV("rain_flow_bores.csv", state._timeseriesRows));
+  document.getElementById("btn-csv-lag").addEventListener("click", () => downloadCSV("lag_correlations.csv", state._lagRows));
+
   document.querySelectorAll(".btn-download-png").forEach((btn) => {
-    btn.addEventListener("click", () => Plotly.downloadImage(btn.dataset.target, { format: "png", filename: btn.dataset.name, width: 1200, height: 600, scale: 2 }));
+    btn.addEventListener("click", () => {
+      const isTall = btn.dataset.target === "climate-timeseries-chart";
+      Plotly.downloadImage(btn.dataset.target, {
+        format: "png", filename: btn.dataset.name, width: 1200, height: isTall ? 900 : 600, scale: 2
+      });
+    });
+  });
+
+  window.addEventListener("themechange", () => {
+    if (state.view === "climate") {
+      drawAnomaly();
+      drawWetterDrier();
+      drawResidualMass("015643", "climate-rain-residual-chart", false);
+      drawResidualMass(null, "climate-flow-residual-chart", true);
+      drawSeasonal();
+      drawTimeseries();
+      drawLag();
+    }
   });
 
   await refreshRuns();
   await drawResidualMass("015643", "climate-rain-residual-chart", false);
   await drawResidualMass(null, "climate-flow-residual-chart", true);
+  await drawTimeseries();
+  await drawLag();
 }
 
 // ---------------------------------------------------------------------------

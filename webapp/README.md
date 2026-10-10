@@ -16,11 +16,10 @@ see "What's installed" below if setting up fresh):
 
 ```bash
 python3 -m venv ~/venvs/hit401_web
-~/venvs/hit401_web/bin/pip install fastapi uvicorn pandas numpy geopandas pyogrio shapely pyarrow xarray netCDF4 httpx
+~/venvs/hit401_web/bin/pip install -r webapp/requirements.txt
 ```
 
-No other package is required. In particular, **`plotly` is not needed on the server** —
-see "Design notes" below for why, even though the page draws Plotly charts.
+Packages included: `fastapi`, `uvicorn`, `pandas`, `numpy`, `geopandas`, `pyogrio`, `shapely`, `pyarrow`, `xarray`, `netCDF4`, `httpx`, and `plotly` (used by `climate_models.py` for server-side figure generation where appropriate).
 
 ## Build the cache (run once, and again after any raw data file changes)
 
@@ -107,8 +106,12 @@ webapp/
 - **Compare tray**: add up to 5 bores from their drawer, then overlay any chemical
   parameter or the water-level series for all of them on one chart.
 - **Climate view** (top-bar switch): the Darwin/Ti Tree CMIP6 anomaly-bar and
-  wetter-or-drier charts from `climate/climate_models.py`, plus the rainfall and river-
-  flow residual-mass charts, all computed live from that module — nothing is re-typed.
+  wetter-or-drier charts from `climate/climate_models.py`, the rainfall and river-
+  flow residual-mass charts, plus the **seasonal recharge charts** (observed gauge totals
+  vs CMIP6 model projections out to 2099), **rainfall, flow, and bore water-level time series**
+  (three-panel stacked comparison from 2010 onwards), and **lag correlation charts**
+  (evaluating how long after rainfall or flow the water table moves) — all computed live
+  from that module.
 - **Every chart**: downloads as PNG (the chart's own toolbar or the button underneath)
   or as the exact CSV used to draw it.
 - **Shareable link**: the URL updates with the selected site, its open tab, and which
@@ -122,13 +125,6 @@ webapp/
   step; nothing in this app downloads or refreshes source data on its own.
   `climate/download_cmip6_pr.py` exists as a separate manual script for the CMIP6 data
   specifically, also not wired into any UI.
-- **Seasonal and lag charts are planned, not built.** `climate_models.py` already has
-  the functions for this (`seasonal_totals_observed`/`seasonal_totals_model`,
-  `lag_correlations`, `plot_rain_flow_bores`) — the two climate endpoints in
-  `server.py` currently call only `water_year_totals`/`anomalies`/`trailing_mean`/
-  `change_table` (the anomaly-bar and wetter-or-drier charts). Wiring in the rest is
-  planned as a follow-up, likely its own `/api/climate/seasonal` and
-  `/api/climate/lag` endpoints plus a new section in the Climate view.
 - **CSV download for the compare tray is planned, not built.** Every single-location
   chart has a CSV download already; the multi-bore compare overlay (`openCompareView`
   in `app.js`) does not yet.
@@ -176,15 +172,15 @@ webapp/
 
 ## Design notes
 
-- **No `plotly` on the server.** `climate_models.py`'s `plot_anomaly_bars()` and
-  `plot_wetter_or_drier()` build `plotly.graph_objects.Figure` objects, which needs the
-  `plotly` Python package — not in the approved install list. Rather than ask for an
-  extra install mid-build, the two climate endpoints in `server.py` call
-  `climate_models`'s underlying **data** functions directly (`water_year_totals`,
-  `anomalies`, `trailing_mean`, `change_table`, `cell_info`) and its own colour
-  constants, and return plain JSON; the browser's own vendored Plotly.js draws the
-  actual figure. The numbers and colours are identical to what those two functions
-  would draw — only which language builds the chart object differs.
+- **Plotly integration & dual representation.** `climate_models.py`'s `plot_anomaly_bars()`,
+  `plot_wetter_or_drier()`, `plot_seasonal()`, `plot_lag_correlation()`, and
+  `plot_rain_flow_bores()` build `plotly.graph_objects.Figure` objects. The backend
+  climate endpoints in `server.py` (`/api/climate/anomaly`, `/api/climate/wetter-drier`,
+  `/api/climate/seasonal`, `/api/climate/lag`, `/api/climate/rain-flow-bores`) return
+  both structured data arrays (for CSV exports and responsive table rendering) as well
+  as serialised Plotly figure structures, allowing the browser's vendored Plotly.js to
+  draw interactive charts with full theme support (light and dark mode).
+
 - **No LTTB downsampling was needed.** Every series actually shown is already small:
   water quality averages ~5 samples per bore, and rainfall/flow/water-level are all
   aggregated to **monthly** means before being sent to the browser (reusing

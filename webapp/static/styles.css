@@ -103,7 +103,7 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
 /* ---------------- Overall layout ---------------- */
 #main { height: calc(100% - var(--topbar-h)); position: relative; }
 .view { height: 100%; width: 100%; }
-.view.hidden { display: none; }
+.hidden, .view.hidden, #map-view.hidden, #climate-view.hidden { display: none !important; }
 
 #map-view { display: flex; height: 100%; min-width: 0; }
 
@@ -284,6 +284,17 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
 #climate-body select { padding: 7px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); margin-bottom: 10px; font-size: 14px; }
 #climate-body label { display: block; font-size: 13px; color: var(--text-muted); margin-top: 10px; }
 #climate-body .chart { height: 440px; min-height: 400px; }
+#climate-body .chart-tall { height: 720px; min-height: 560px; }
+
+.climate-controls-row {
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 8px 0 12px;
+}
+.climate-controls-row label {
+  margin-top: 0 !important; display: inline-flex !important; align-items: center; gap: 6px;
+}
+.climate-controls-row select {
+  margin-bottom: 0 !important;
+}
 
 /* ---------------- About overlay ---------------- */
 .overlay-panel {
