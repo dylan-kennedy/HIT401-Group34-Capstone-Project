@@ -16,16 +16,15 @@ see "What's installed" below if setting up fresh):
 
 ```bash
 python3 -m venv ~/venvs/hit401_web
-~/venvs/hit401_web/bin/pip install fastapi uvicorn pandas numpy geopandas pyogrio shapely pyarrow xarray netCDF4 httpx
+~/venvs/hit401_web/bin/pip install -r webapp/requirements.txt
 ```
 
-No other package is required. In particular, **`plotly` is not needed on the server** —
-see "Design notes" below for why, even though the page draws Plotly charts.
+Packages included: `fastapi`, `uvicorn`, `pandas`, `numpy`, `geopandas`, `pyogrio`, `shapely`, `pyarrow`, `xarray`, `netCDF4`, `httpx`, and `plotly` (used by `climate_models.py` for server-side figure generation where appropriate).
 
-## Build the cache (run once, and again after any raw data file changes)
+## Build the cache (run once, and again after any raw data file changes or portal URL updates)
 
 ```bash
-~/venvs/hit401_web/bin/python webapp/build_cache.py
+python webapp/build_cache.py
 ```
 
 Takes about 5–15 seconds. Reads, read-only:
@@ -37,14 +36,15 @@ Takes about 5–15 seconds. Reads, read-only:
 - `Datasets/StreamflowData/` (gauge G0280010)
 - `climate/climate_models.py`, imported for its rainfall/flow aggregation logic
 
-Writes compact Parquet/JSON/GeoJSON files to `webapp/cache/` only. Prints a short
-summary and writes `webapp/cache/build_report.json` with every repair, conflict and
-warning found along the way (see "Data findings" below for the highlights).
+Writes compact Parquet/JSON/GeoJSON files to `webapp/cache/` only. Normalises legacy
+NT Water Data Portal domains (`water.nt.gov.au` -> `ntg.aquaticinformatics.net`).
+Prints a short summary and writes `webapp/cache/build_report.json` with every repair,
+conflict and warning found along the way.
 
 ## Run
 
 ```bash
-~/venvs/hit401_web/bin/python webapp/server.py
+python webapp/server.py
 ```
 
 Then open **http://127.0.0.1:8000**. Add `--port 8080` or `--host 0.0.0.0` if needed.
@@ -52,8 +52,8 @@ Then open **http://127.0.0.1:8000**. Add `--port 8080` or `--host 0.0.0.0` if ne
 ## Test
 
 ```bash
-~/venvs/hit401_web/bin/python webapp/tests/test_build_cache.py   # 10 tests, no data files needed
-~/venvs/hit401_web/bin/python webapp/tests/test_api.py           # 22 tests, needs the cache built
+python webapp/tests/test_build_cache.py   # 16 tests, tests ID normalisation & portal URL migration
+python webapp/tests/test_api.py           # 35 tests, needs the cache built
 ```
 
 Both run as plain scripts (same convention as `climate/tests/`) — no pytest installed
@@ -82,12 +82,27 @@ webapp/
                           copy of krishna-code/data.zip. Rebuilt by build_cache.py.
   tests/
     test_build_cache.py  ID normalisation, the Bores.csv repair, shared constants
-    test_api.py          every API endpoint, against the real built cache
+    test_api.py          every API endpoint (32 tests), against the real built cache
   README.md              this file
 ```
 
 ## The page
 
+- **Executive KPI Summary Banner**: Displays key basin-wide performance indicators at the top
+  of the dashboard (reimplemented from `krishna-code/app(v1.2).py`):
+  - **Total Study Bores** (415 in Ti Tree basin, 43,099 NT-wide)
+  - **Quality Monitored Bores** (272 in basin with historical chemical assays, 16,929 NT-wide)
+  - **Water Quality Samples** (1,185 basin chemical assays, 84,769 NT-wide)
+  - **Monitoring Bores** (126 in basin, 36 currently active; 2,274 NT-wide)
+  Includes a smooth toggle button to collapse/expand the banner for maximum map workspace.
+- **Quick Bore Search**: Dedicated sidebar control (reimplemented from `krishna-code/app(v1.2).py`)
+  featuring a sorted dropdown (`Search bore by ID:`) of Ti Tree study basin bores plus a quick
+  jump input with automatic ID normalisation (e.g. `6543` -> `RN006543`), automatically centering
+  the map and opening the detail drawer.
+- **Statistical Summary Cards**: 4-metric statistics cards (reimplemented from `krishna-code/app(v1.2).py`)
+  calculating and displaying **Minimum**, **Maximum**, **Mean**, and **Median** (formatted to 2 decimal
+  places with observation counts) for valid numerical observations in the Water Quality and Water
+  Level time-series tabs, gracefully handling non-numeric or missing data.
 - **Map**: every NT bore, river/stream gauge and BOM rainfall station on one map, with
   3 base layers (OpenTopoMap, Esri satellite, OpenStreetMap) and the 5 Ti Tree aquifer
   overlays (salinity, aquifer thickness, depth to groundwater, contours, boundary) as
@@ -107,8 +122,12 @@ webapp/
 - **Compare tray**: add up to 5 bores from their drawer, then overlay any chemical
   parameter or the water-level series for all of them on one chart.
 - **Climate view** (top-bar switch): the Darwin/Ti Tree CMIP6 anomaly-bar and
-  wetter-or-drier charts from `climate/climate_models.py`, plus the rainfall and river-
-  flow residual-mass charts, all computed live from that module — nothing is re-typed.
+  wetter-or-drier charts from `climate/climate_models.py`, the rainfall and river-
+  flow residual-mass charts, plus the **seasonal recharge charts** (observed gauge totals
+  vs CMIP6 model projections out to 2099), **rainfall, flow, and bore water-level time series**
+  (three-panel stacked comparison from 2010 onwards), and **lag correlation charts**
+  (evaluating how long after rainfall or flow the water table moves) — all computed live
+  from that module.
 - **Every chart**: downloads as PNG (the chart's own toolbar or the button underneath)
   or as the exact CSV used to draw it.
 - **Shareable link**: the URL updates with the selected site, its open tab, and which
@@ -122,13 +141,6 @@ webapp/
   step; nothing in this app downloads or refreshes source data on its own.
   `climate/download_cmip6_pr.py` exists as a separate manual script for the CMIP6 data
   specifically, also not wired into any UI.
-- **Seasonal and lag charts are planned, not built.** `climate_models.py` already has
-  the functions for this (`seasonal_totals_observed`/`seasonal_totals_model`,
-  `lag_correlations`, `plot_rain_flow_bores`) — the two climate endpoints in
-  `server.py` currently call only `water_year_totals`/`anomalies`/`trailing_mean`/
-  `change_table` (the anomaly-bar and wetter-or-drier charts). Wiring in the rest is
-  planned as a follow-up, likely its own `/api/climate/seasonal` and
-  `/api/climate/lag` endpoints plus a new section in the Climate view.
 - **CSV download for the compare tray is planned, not built.** Every single-location
   chart has a CSV download already; the multi-bore compare overlay (`openCompareView`
   in `app.js`) does not yet.
@@ -173,18 +185,27 @@ webapp/
   to what's actually on disk (the first omits station 015643, the only one near Ti Tree;
   the second lists 3 rows against 17 real export folders) — this build derives its own
   indices from the source files instead of trusting either.
+- **NT Water Data Portal domain migration (`water.nt.gov.au` -> `ntg.aquaticinformatics.net`)**:
+  Raw groundwater-monitoring layer shapefiles (`Bores_groundwater_level.shp`) contained legacy links
+  using `http(s)://water.nt.gov.au/...`, which the NT Government decommissioned and redirects to a
+  generic disclaimer losing the specific bore or gauge ID. The application converts these links to
+  `https://ntg.aquaticinformatics.net/...` at both cache build time (`build_cache.py`), server
+  startup (`server.py`), and client side (`app.js`), preserving the `/Data/Location/...` path, query
+  parameters, and identifiers, while leaving valid unrelated external links (such as `ntlis.nt.gov.au`
+  bore reports) and records with no portal link untouched. Rebuilding the cache (`python webapp/build_cache.py`)
+  persists these cleaned URLs directly into the on-disk parquet files.
 
 ## Design notes
 
-- **No `plotly` on the server.** `climate_models.py`'s `plot_anomaly_bars()` and
-  `plot_wetter_or_drier()` build `plotly.graph_objects.Figure` objects, which needs the
-  `plotly` Python package — not in the approved install list. Rather than ask for an
-  extra install mid-build, the two climate endpoints in `server.py` call
-  `climate_models`'s underlying **data** functions directly (`water_year_totals`,
-  `anomalies`, `trailing_mean`, `change_table`, `cell_info`) and its own colour
-  constants, and return plain JSON; the browser's own vendored Plotly.js draws the
-  actual figure. The numbers and colours are identical to what those two functions
-  would draw — only which language builds the chart object differs.
+- **Plotly integration & dual representation.** `climate_models.py`'s `plot_anomaly_bars()`,
+  `plot_wetter_or_drier()`, `plot_seasonal()`, `plot_lag_correlation()`, and
+  `plot_rain_flow_bores()` build `plotly.graph_objects.Figure` objects. The backend
+  climate endpoints in `server.py` (`/api/climate/anomaly`, `/api/climate/wetter-drier`,
+  `/api/climate/seasonal`, `/api/climate/lag`, `/api/climate/rain-flow-bores`) return
+  both structured data arrays (for CSV exports and responsive table rendering) as well
+  as serialised Plotly figure structures, allowing the browser's vendored Plotly.js to
+  draw interactive charts with full theme support (light and dark mode).
+
 - **No LTTB downsampling was needed.** Every series actually shown is already small:
   water quality averages ~5 samples per bore, and rainfall/flow/water-level are all
   aggregated to **monthly** means before being sent to the browser (reusing

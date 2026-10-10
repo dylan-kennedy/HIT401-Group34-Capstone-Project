@@ -90,3 +90,41 @@ Extract the data.zip folder into the same dylan-code folder first.
 "streamlit run dylan-code\Updated_Dashboard_Prototype.py"
 
 "deactivate" when finished & delete .venv folder if you wish.
+
+
+---
+
+## Running the Web Application (Data Explorer & Climate Analysis)
+
+The unified web application in `webapp/` provides full exploratory access to all Northern Territory bore datasets, water quality samples, streamflow records, BOM rainfall, Ti Tree aquifer overlay layers, and integrated CMIP6 climate models / hydrology analyses.
+
+This directly addresses **Cat's Aim 2**: analysing seasonal recharge patterns and investigating the relationship between bore levels and rainfall.
+
+### 1. Setup & Installation
+Install dependencies:
+```bash
+pip install -r webapp/requirements.txt
+```
+
+### 2. Build Cache (if setting up fresh or after raw data changes)
+```bash
+python webapp/build_cache.py
+```
+
+### 3. Launch the Server
+```bash
+python webapp/server.py
+```
+Open **http://127.0.0.1:8000** in your browser.
+
+### 4. Climate & Hydrology Analyses
+Switch to the **Climate** view using the top navigation bar to explore:
+- **Seasonal Recharge (Observed vs Modelled)**: Wet season (Nov–Apr) and dry season (May–Oct) rainfall totals per year using `seasonal_totals_observed` for gauge records (Territory Grape Farm 015643) and `seasonal_totals_model` for CMIP6 model projections. Users can toggle projections out to 2099 and download chart data as CSV.
+- **Rainfall, River Flow, and Bore Water Levels (Time Series Comparison)**: 3-panel comparison using `plot_rain_flow_bores` across the modern telemetry record (2010 onwards) examining rainfall residual mass, Woodforde River flow residual mass, and monitoring bore water levels (m AHD).
+- **Lag Correlation (Rainfall & Streamflow vs Bore Levels)**: Time-lagged Pearson correlation analysis using `lag_correlations` comparing monthly anomalies against month-to-month changes in bore levels across 0–12+ months to investigate recharge timing hints.
+
+### 5. Running Tests
+```bash
+python webapp/tests/test_api.py
+python webapp/tests/test_build_cache.py
+```
