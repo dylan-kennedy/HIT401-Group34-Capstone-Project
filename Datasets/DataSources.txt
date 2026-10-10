@@ -31,8 +31,7 @@ HIT401 Group 34 Capstone Project — Dataset Provenance and Sources
    - Provenance: Provided by supervisor, sourced from the Australian Bureau of
      Meteorology (BOM) Climate Data Online (https://www.bom.gov.au/climate/data/).
    - Geographic Coverage & Actual Stations:
-     Contrary to an early assumption that this folder only contained Perth data,
-     the folder actually contains daily rainfall data (Data.csv) and station notes
+    The folder contains daily rainfall data (Data.csv) and station notes
      (Note.txt) for 11 BOM weather stations across Australia, including 2 Northern
      Territory stations:
        * 015643: TERRITORY GRAPE FARM (NT) — Lat: -22.45°, Lon: 133.64°, opened 1987.

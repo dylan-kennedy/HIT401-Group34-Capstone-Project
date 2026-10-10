@@ -1363,13 +1363,7 @@ async function openCompareView() {
 // CLIMATE VIEW
 // ---------------------------------------------------------------------------
 
-// GAURAB: climate_models.py's seasonal_totals_observed/seasonal_totals_model,
-// lag_correlations and plot_rain_flow_bores are not wired into any endpoint yet (only
-// water_year_totals/anomalies/trailing_mean/change_table are, via /api/climate/anomaly
-// and /api/climate/wetter-drier). A natural place for a new "Seasonal / lag" section is
-// a new <h3> block appended inside #climate-body below, paired with new
-// /api/climate/seasonal and /api/climate/lag endpoints in server.py. See
-// webapp/README.md "Known gaps".
+
 async function initClimateView() {
   const locationSelect = document.getElementById("climate-location");
   const runSelect = document.getElementById("climate-run");

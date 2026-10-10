@@ -123,10 +123,8 @@ for decline / blue for rise.
 
 ## 6. Known limitations
 
-- The supplied folder contains **water levels only**. No abstraction/pumping series,
-  no streamflow gauging record and no hydrochemistry were included, so the drawdown,
-  baseflow and connectivity functions in `toolkit_demo.py` are validated against
-  synthetic data only and have not yet been run on real records.
+- The supplied folder contains **water levels only**. No abstraction/pumping series was included, so the drawdown, baseflow and connectivity functions in `toolkit_demo.py` are validated against synthetic data only and have not yet been run on real records.
+
 - Trends are fitted as linear. A bore with a genuine change of regime (for example a
   new extraction licence part-way through the record) will be poorly summarised by a
   single slope.
