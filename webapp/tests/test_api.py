@@ -273,6 +273,48 @@ def test_climate_rain_flow_bores_returns_figure_and_rows():
 
 
 # ---------------------------------------------------------
+# Legacy App Features: KPI banner and statistics calculations
+# ---------------------------------------------------------
+
+def test_meta_contains_study_area_and_wq_samples():
+    data = client.get("/api/meta").json()
+    assert "study_area" in data
+    sa = data["study_area"]
+    assert sa["bores"] == 415
+    assert sa["quality_bores"] == 272
+    assert sa["quality_samples"] == 1185
+    assert sa["monitoring_bores"] == 126
+    assert sa["active_monitoring_bores"] == 36
+    assert len(sa["bore_ids"]) == 415
+    assert "RN006543" in sa["bore_ids"]
+    assert data["counts"]["water_quality_samples"] == 84769
+
+
+def test_water_quality_series_returns_statistics_card_data():
+    resp = client.get("/api/water-quality/RN006543", params={"parameter": "TDS"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "statistics" in data
+    stats = data["statistics"]
+    assert stats is not None
+    assert "min" in stats and "max" in stats and "mean" in stats and "median" in stats and "count" in stats
+    assert stats["count"] == len(data["values"])
+    assert stats["min"] <= stats["median"] <= stats["max"]
+    assert stats["min"] <= stats["mean"] <= stats["max"]
+
+
+def test_water_level_series_returns_statistics_card_data():
+    resp = client.get("/api/water-level/RN006543")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "statistics" in data
+    stats = data["statistics"]
+    assert stats is not None
+    assert "min" in stats and "max" in stats and "mean" in stats and "median" in stats and "count" in stats
+    assert stats["min"] <= stats["median"] <= stats["max"]
+
+
+# ---------------------------------------------------------
 # static page
 # ---------------------------------------------------------
 

@@ -94,6 +94,24 @@ AQUIFER = {
 STUDY_AREA = AQUIFER["boundary"].geometry.union_all()
 CONTOURS_PROJECTED = AQUIFER["contours"].to_crs(epsg=28353)
 
+# Precompute Ti Tree study area metrics once at startup for KPI banner & quick bore search
+_pts = gpd.GeoSeries(gpd.points_from_xy(BORES["longitude"], BORES["latitude"]), crs="EPSG:4326")
+_sa_mask = _pts.intersects(STUDY_AREA)
+STUDY_AREA_BORE_IDS = sorted(BORES.loc[_sa_mask, "bore_no"].dropna().unique().tolist())
+_sa_bores_set = set(STUDY_AREA_BORE_IDS)
+_sa_wq = WQ_FULL[WQ_FULL["bore_no"].isin(_sa_bores_set)]
+_sa_mon = BORES.loc[_sa_mask & BORES["is_monitoring_location"]]
+_sa_mon_active = _sa_mon[_sa_mon["monitor_active"] == "Current"] if "monitor_active" in _sa_mon.columns else _sa_mon
+
+STUDY_AREA_METRICS = {
+    "bores": len(STUDY_AREA_BORE_IDS),
+    "quality_bores": int(_sa_wq["bore_no"].nunique()),
+    "quality_samples": int(len(_sa_wq)),
+    "monitoring_bores": int(len(_sa_mon)),
+    "active_monitoring_bores": int(len(_sa_mon_active)),
+    "bore_ids": STUDY_AREA_BORE_IDS,
+}
+
 print(f"Loaded caches: {len(BORES):,} bores, {len(GAUGES)} gauges, {len(BOM_STATIONS)} "
       f"BOM stations in {time.time() - START_TIME:.2f}s.")
 
@@ -229,11 +247,13 @@ def api_meta():
             "bores_with_water_level": int(BORES["has_water_level"].sum()),
             "bores_claiming_water_level": int(BORES["water_level_claimed"].sum()),
             "bores_with_water_quality": int(BORES["has_water_quality"].sum()),
+            "water_quality_samples": len(WQ_FULL),
             "monitoring_bores": int(BORES["is_monitoring_location"].sum()),
             "river_stream_gauges": len(GAUGES),
             "bom_stations": len(BOM_STATIONS),
             "bom_stations_nt": int(BOM_STATIONS["is_nt"].sum()),
         },
+        "study_area": STUDY_AREA_METRICS,
         "measurements": MEASUREMENTS,
         "constants": CONSTANTS,
         "status_options": sorted(BORES["status"].dropna().unique().tolist()),
@@ -452,10 +472,21 @@ def api_water_quality_series(bore_id: str, parameter: str = Query(...)):
         raise HTTPException(400, f"Unknown parameter {parameter}. Use one of {columns}.")
     rows = WQ_FULL[WQ_FULL["bore_no"] == bore_id][["sample_date", parameter]].dropna()
     rows = rows.sort_values("sample_date")
+    vals = rows[parameter].astype(float)
+    stats = None
+    if not vals.empty:
+        stats = {
+            "min": round(float(vals.min()), 2),
+            "max": round(float(vals.max()), 2),
+            "mean": round(float(vals.mean()), 2),
+            "median": round(float(vals.median()), 2),
+            "count": int(len(vals)),
+        }
     return {
         "bore_no": bore_id, "parameter": parameter,
         "dates": rows["sample_date"].dt.strftime("%Y-%m-%d").tolist(),
-        "values": rows[parameter].astype(float).tolist(),
+        "values": vals.tolist(),
+        "statistics": stats,
     }
 
 
@@ -483,10 +514,22 @@ def api_water_level_series(
         if not path.exists():
             raise HTTPException(404, f"No water-level series for {bore_id}")
     table = pd.read_parquet(path)
+    valid_vals = [float(v) for v in table["value"] if pd.notna(v)]
+    stats = None
+    if valid_vals:
+        s = pd.Series(valid_vals, dtype=float)
+        stats = {
+            "min": round(float(s.min()), 2),
+            "max": round(float(s.max()), 2),
+            "mean": round(float(s.mean()), 2),
+            "median": round(float(s.median()), 2),
+            "count": int(len(s)),
+        }
     return {
         "bore_no": bore_id, "kind": safe_kind, "series": safe_series,
         "months": table["month"].tolist(),
         "values": [None if pd.isna(v) else float(v) for v in table["value"]],
+        "statistics": stats,
     }
 
 

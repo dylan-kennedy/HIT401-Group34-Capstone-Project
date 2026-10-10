@@ -539,6 +539,185 @@ function initSearch() {
 }
 
 // ---------------------------------------------------------------------------
+// LEGACY FEATURES: KPI BANNER, QUICK BORE SEARCH, AND STATS CARD
+// ---------------------------------------------------------------------------
+
+function normaliseBoreId(value) {
+  if (!value) return null;
+  const text = String(value).trim().toUpperCase().replace(/\s+/g, "");
+  if (!text) return null;
+  if (text.startsWith("RN")) {
+    const digits = text.slice(2).replace(/\D/g, "");
+    if (digits) {
+      return "RN" + String(parseInt(digits, 10)).padStart(6, "0");
+    }
+  } else if (/^\d+$/.test(text)) {
+    return "RN" + String(parseInt(text, 10)).padStart(6, "0");
+  }
+  return text;
+}
+
+function initKPIBanner() {
+  const meta = state.meta;
+  if (!meta) return;
+  const sa = meta.study_area || {};
+  const counts = meta.counts || {};
+
+  const boresVal = document.getElementById("kpi-bores");
+  const qualityVal = document.getElementById("kpi-quality-bores");
+  const samplesVal = document.getElementById("kpi-quality-samples");
+  const monVal = document.getElementById("kpi-monitoring-bores");
+
+  if (boresVal) boresVal.textContent = (sa.bores != null ? sa.bores : counts.bores || 0).toLocaleString();
+  if (qualityVal) qualityVal.textContent = (sa.quality_bores != null ? sa.quality_bores : counts.bores_with_water_quality || 0).toLocaleString();
+  if (samplesVal) samplesVal.textContent = (sa.quality_samples != null ? sa.quality_samples : counts.water_quality_samples || 0).toLocaleString();
+  if (monVal) monVal.textContent = (sa.monitoring_bores != null ? sa.monitoring_bores : counts.monitoring_bores || 0).toLocaleString();
+
+  const boresSub = document.getElementById("kpi-bores-sub");
+  if (boresSub && counts.bores) {
+    boresSub.textContent = `Ti Tree basin (${counts.bores.toLocaleString()} NT-wide)`;
+  }
+
+  const qualitySub = document.getElementById("kpi-quality-sub");
+  if (qualitySub && counts.bores_with_water_quality) {
+    qualitySub.textContent = `with chemistry (${counts.bores_with_water_quality.toLocaleString()} NT)`;
+  }
+
+  const samplesSub = document.getElementById("kpi-samples-sub");
+  if (samplesSub && counts.water_quality_samples) {
+    samplesSub.textContent = `basin samples (${counts.water_quality_samples.toLocaleString()} NT)`;
+  }
+
+  const monSub = document.getElementById("kpi-monitoring-sub");
+  if (monSub && counts.monitoring_bores) {
+    const act = sa.active_monitoring_bores != null ? `${sa.active_monitoring_bores} active` : "active";
+    monSub.textContent = `${act} (${counts.monitoring_bores.toLocaleString()} NT)`;
+  }
+
+  const toggleBtn = document.getElementById("btn-kpi-toggle");
+  const banner = document.getElementById("kpi-banner");
+  if (toggleBtn && banner) {
+    toggleBtn.addEventListener("click", () => {
+      banner.classList.toggle("collapsed");
+      const isCol = banner.classList.contains("collapsed");
+      toggleBtn.textContent = isCol ? "▼" : "▲";
+      toggleBtn.title = isCol ? "Expand KPI banner" : "Collapse KPI banner";
+      setTimeout(() => map && map.invalidateSize(), 220);
+    });
+  }
+}
+
+function initQuickBoreSearch() {
+  const select = document.getElementById("quick-bore-select");
+  const input = document.getElementById("quick-bore-input");
+  const goBtn = document.getElementById("btn-quick-bore-go");
+  if (!select) return;
+
+  const saBores = (state.meta && state.meta.study_area && state.meta.study_area.bore_ids)
+    || (state.locations && state.locations.bores ? state.locations.bores.map((b) => b.id) : []);
+
+  select.innerHTML = '<option value="">-- Select a Bore ID --</option>';
+  saBores.forEach((id) => {
+    select.appendChild(el("option", { value: id }, id));
+  });
+
+  async function jumpToBore(boreId) {
+    if (!boreId) return;
+    const cleanId = normaliseBoreId(boreId);
+    if (!cleanId) return;
+
+    let loc = state.locations && state.locations.bores && state.locations.bores.find((b) => b.id === cleanId);
+    if (!loc) {
+      try {
+        const searchData = await fetchJSON("/api/search", { q: cleanId });
+        const hit = (searchData.results || []).find((r) => r.type === "bore" && r.id === cleanId);
+        if (hit) loc = hit;
+      } catch (e) { /* ignore transient error */ }
+    }
+
+    if (document.getElementById("map-drawer-wrap").classList.contains("map-expanded")) {
+      setLayoutMode("split");
+    }
+
+    if (loc && loc.lat != null && loc.lon != null) {
+      map.setView([loc.lat, loc.lon], 14);
+      await selectLocation("bore", loc.id);
+    } else {
+      await selectLocation("bore", cleanId);
+    }
+  }
+
+  select.addEventListener("change", () => {
+    if (select.value) {
+      jumpToBore(select.value);
+    }
+  });
+
+  if (goBtn && input) {
+    goBtn.addEventListener("click", () => {
+      jumpToBore(input.value.trim());
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        jumpToBore(input.value.trim());
+      }
+    });
+  }
+}
+
+function renderStatsCard(container, { title, values, unit = "" }) {
+  const valid = (values || []).filter((v) => typeof v === "number" && !isNaN(v) && isFinite(v));
+  const cardWrap = el("div", { class: "stats-summary-card" });
+  if (title) {
+    cardWrap.appendChild(el("div", { class: "stats-card-title" }, `📊 Statistical Summary: ${title}`));
+  }
+
+  if (!valid.length) {
+    cardWrap.appendChild(el("div", { class: "stats-empty" }, "No numerical data available for statistical summary."));
+    container.appendChild(cardWrap);
+    return;
+  }
+
+  const min = Math.min(...valid);
+  const max = Math.max(...valid);
+  const sum = valid.reduce((acc, cur) => acc + cur, 0);
+  const mean = sum / valid.length;
+
+  const sorted = [...valid].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+
+  const fmtStat = (num) => num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const grid = el("div", { class: "stats-grid" }, [
+    el("div", { class: "stat-item" }, [
+      el("span", { class: "stat-label" }, "Min"),
+      el("span", { class: "stat-val" }, fmtStat(min)),
+    ]),
+    el("div", { class: "stat-item" }, [
+      el("span", { class: "stat-label" }, "Max"),
+      el("span", { class: "stat-val" }, fmtStat(max)),
+    ]),
+    el("div", { class: "stat-item" }, [
+      el("span", { class: "stat-label" }, "Mean"),
+      el("span", { class: "stat-val" }, fmtStat(mean)),
+    ]),
+    el("div", { class: "stat-item" }, [
+      el("span", { class: "stat-label" }, "Median"),
+      el("span", { class: "stat-val" }, fmtStat(median)),
+    ]),
+  ]);
+  cardWrap.appendChild(grid);
+
+  const unitText = unit ? ` · Units: ${unit}` : "";
+  const meta = el("div", { class: "stats-meta" }, `Valid observations: ${valid.length.toLocaleString()}${unitText}`);
+  cardWrap.appendChild(meta);
+
+  container.appendChild(cardWrap);
+}
+
+// ---------------------------------------------------------------------------
 // SIDEBAR WIRING
 // ---------------------------------------------------------------------------
 
@@ -820,12 +999,17 @@ async function renderWaterLevelTab(body, { id }, detail) {
   ));
   body.appendChild(el("p", { class: "caption" }, "Monthly mean. A gap in the line means no reading that month, not zero."));
   body.appendChild(select);
+  const wlStatsWrap = el("div", { id: "wl-stats-wrap" });
+  body.appendChild(wlStatsWrap);
   const chartDiv = el("div", { id: "wl-chart", class: "chart" });
   body.appendChild(chartDiv);
 
   async function draw() {
     const [kind, series] = select.value.split("|||");
     const data = await fetchJSON(`/api/water-level/${id}`, { kind, series });
+    wlStatsWrap.innerHTML = "";
+    const unit = kind.toLowerCase().includes("depth") ? "m below ground" : "m AHD";
+    renderStatsCard(wlStatsWrap, { title: `${kind} (${series})`, values: data.values, unit });
     Plotly.newPlot("wl-chart", [{
       x: data.months, y: data.values, mode: "lines+markers", connectgaps: false,
       line: { color: "#0067a3" }, marker: { size: 4 },
@@ -876,12 +1060,16 @@ async function renderWaterQualityTab(body, { id }, detail) {
   const select = el("select", {}, summary.map((row) => el("option", { value: row.parameter }, row.parameter)));
   body.appendChild(el("h3", {}, "Time series"));
   body.appendChild(select);
+  const wqStatsWrap = el("div", { id: "wq-stats-wrap" });
+  body.appendChild(wqStatsWrap);
   const chartDiv = el("div", { id: "wq-chart", class: "chart" });
   body.appendChild(chartDiv);
 
   async function draw() {
     const param = select.value;
     const data = await fetchJSON(`/api/water-quality/${id}`, { parameter: param });
+    wqStatsWrap.innerHTML = "";
+    renderStatsCard(wqStatsWrap, { title: param, values: data.values });
     Plotly.newPlot("wq-chart", [{
       x: data.dates, y: data.values, mode: "lines+markers", line: { color: "#2f6f4e" },
     }], { ...plotlyTheme(), margin: { t: 20, r: 10, l: 50, b: 40 }, yaxis: { title: param } }, { displaylogo: false, responsive: true });
@@ -1457,6 +1645,8 @@ async function init() {
     state.meta = await fetchJSON("/api/meta");
     const locations = await fetchJSON("/api/locations");
     state.locations = locations;
+    initKPIBanner();
+    initQuickBoreSearch();
     populateFilterOptions();
     await updateColourControls();
     updateLegend();

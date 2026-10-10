@@ -105,7 +105,82 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
 .view { height: 100%; width: 100%; }
 .hidden, .view.hidden, #map-view.hidden, #climate-view.hidden { display: none !important; }
 
-#map-view { display: flex; height: 100%; min-width: 0; }
+#map-view { display: flex; flex-direction: column; height: 100%; min-width: 0; }
+#map-workspace { display: flex; flex: 1 1 auto; min-height: 0; min-width: 0; position: relative; }
+
+/* ---------------- Executive KPI Banner ---------------- */
+.kpi-banner {
+  flex-shrink: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+  position: relative;
+  transition: all 0.2s ease;
+  z-index: 20;
+}
+.kpi-banner.collapsed .kpi-banner-inner { display: none; }
+.kpi-banner.collapsed { padding: 4px 16px; }
+.kpi-banner-inner {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.kpi-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+.kpi-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.kpi-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kpi-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1.2;
+}
+.kpi-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kpi-toggle-btn {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  border: none;
+  background: none;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.kpi-toggle-btn:hover { background: var(--surface-2); }
 
 #sidebar {
   width: 300px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border);
@@ -255,6 +330,79 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
   background: var(--surface-2); color: var(--text); cursor: pointer;
 }
 .chart-actions button:hover { filter: brightness(0.96); }
+
+/* ---------------- Quick Bore Search Jump ---------------- */
+.quick-jump-row { display: flex; gap: 6px; margin-top: 6px; }
+.quick-jump-row input {
+  flex: 1; padding: 6px 8px; font-size: 13px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+}
+.btn-subtle {
+  padding: 6px 12px; font-size: 12.5px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  cursor: pointer; white-space: nowrap; font-weight: 500;
+}
+.btn-subtle:hover {
+  background: var(--accent); color: var(--accent-contrast); border-color: var(--accent);
+}
+
+/* ---------------- Statistics Summary Card (Legacy App Feature) ---------------- */
+.stats-summary-card {
+  margin: 12px 0 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.stats-card-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+.stat-item {
+  padding: 8px 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.stat-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  word-break: break-all;
+}
+.stats-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  text-align: right;
+}
+.stats-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 8px 0;
+  font-style: italic;
+}
 
 /* Gaurab: the compare-tray overlay charts (openCompareView in app.js) render into
    #cmp-wq-chart / #cmp-wl-chart using the same .chart sizing above, and their

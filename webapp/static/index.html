@@ -31,9 +31,64 @@
 
   <!-- ===================== MAP VIEW ===================== -->
   <div id="map-view" class="view">
+
+    <!-- Executive KPI Summary Banner (from legacy app) -->
+    <section id="kpi-banner" class="kpi-banner" aria-label="Executive KPI Summary Banner">
+      <div class="kpi-banner-inner">
+        <div class="kpi-card" id="card-kpi-bores" title="Total study bores in the Ti Tree basin">
+          <div class="kpi-icon">📍</div>
+          <div class="kpi-text">
+            <span class="kpi-label">Total Study Bores</span>
+            <span class="kpi-value" id="kpi-bores">—</span>
+            <span class="kpi-sub" id="kpi-bores-sub">Ti Tree basin (43,099 NT-wide)</span>
+          </div>
+        </div>
+        <div class="kpi-card" id="card-kpi-quality" title="Bores with historical water quality monitoring records">
+          <div class="kpi-icon">🧪</div>
+          <div class="kpi-text">
+            <span class="kpi-label">Quality Monitored Bores</span>
+            <span class="kpi-value" id="kpi-quality-bores">—</span>
+            <span class="kpi-sub" id="kpi-quality-sub">with chemistry (16,929 NT)</span>
+          </div>
+        </div>
+        <div class="kpi-card" id="card-kpi-samples" title="Total water quality chemical assay records">
+          <div class="kpi-icon">🔬</div>
+          <div class="kpi-text">
+            <span class="kpi-label">Water Quality Samples</span>
+            <span class="kpi-value" id="kpi-quality-samples">—</span>
+            <span class="kpi-sub" id="kpi-samples-sub">historical samples (84k NT)</span>
+          </div>
+        </div>
+        <div class="kpi-card" id="card-kpi-monitoring" title="Bores designated as groundwater monitoring stations">
+          <div class="kpi-icon">📊</div>
+          <div class="kpi-text">
+            <span class="kpi-label">Monitoring Bores</span>
+            <span class="kpi-value" id="kpi-monitoring-bores">—</span>
+            <span class="kpi-sub" id="kpi-monitoring-sub">active monitoring sites (2,274 NT)</span>
+          </div>
+        </div>
+      </div>
+      <button id="btn-kpi-toggle" class="kpi-toggle-btn" type="button" title="Collapse / expand KPI banner" aria-label="Collapse KPI banner">▲</button>
+    </section>
+
+    <div id="map-workspace">
     <aside id="sidebar">
       <button id="sidebar-collapse" type="button" title="Collapse panel" aria-label="Collapse filter panel">«</button>
       <div id="sidebar-content">
+
+        <!-- Quick Bore Search (from legacy app) -->
+        <section class="panel-section" id="section-quick-search">
+          <h3>🔍 Quick bore search</h3>
+          <label for="quick-bore-select">Search bore by ID:</label>
+          <select id="quick-bore-select">
+            <option value="">-- Select a Bore ID --</option>
+          </select>
+          <div class="quick-jump-row">
+            <input id="quick-bore-input" type="text" placeholder="Or enter bore ID (e.g. RN006543)…" autocomplete="off">
+            <button id="btn-quick-bore-go" type="button" class="btn-subtle">Go</button>
+          </div>
+          <p class="caption">Choose from basin study bores or enter any bore ID to centre and open.</p>
+        </section>
 
         <section class="panel-section">
           <h3>Show on map</h3>
@@ -154,6 +209,7 @@
     </aside>
 
     <div id="place-summary" class="hidden"></div>
+    </div>
     </div>
   </div>
 
