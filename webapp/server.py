@@ -17,6 +17,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 
 import numpy as np
 import pandas as pd
@@ -48,9 +49,36 @@ def _require_cache():
 
 _require_cache()
 
+def fix_water_data_portal_url(value):
+    """Upgrades legacy NT Water Data Portal URLs from the decommissioned
+    water.nt.gov.au host to the official ntg.aquaticinformatics.net host.
+
+    Preserves full path (e.g. /Data/Location/Summary/Location/<ID>/...), query
+    parameters and fragments. Unrelated domains (e.g. ntlis.nt.gov.au bore reports)
+    and already-correct URLs are untouched. Missing/empty values remain None."""
+    if value is None or pd.isna(value):
+        return None
+    text = str(value).strip().strip('"')
+    if not text or not text.startswith("http"):
+        return None
+    try:
+        parsed = urlparse(text)
+    except Exception:
+        return text
+    if parsed.netloc.lower() == "water.nt.gov.au":
+        return urlunparse(parsed._replace(scheme="https", netloc="ntg.aquaticinformatics.net"))
+    return text
+
+
 BORES = pd.read_parquet(CACHE_DIR / "bores.parquet")
 GAUGES = pd.read_parquet(CACHE_DIR / "gauges.parquet")
 MONITORING_BORES = pd.read_parquet(CACHE_DIR / "monitoring_bores.parquet")
+
+BORES["water_data_portal"] = BORES["water_data_portal"].map(fix_water_data_portal_url)
+if "water_data_portal_shp" in BORES.columns:
+    BORES["water_data_portal_shp"] = BORES["water_data_portal_shp"].map(fix_water_data_portal_url)
+MONITORING_BORES["water_data_portal"] = MONITORING_BORES["water_data_portal"].map(fix_water_data_portal_url)
+GAUGES["water_data_portal"] = GAUGES["water_data_portal"].map(fix_water_data_portal_url)
 BOM_STATIONS = pd.read_parquet(CACHE_DIR / "bom_stations.parquet")
 BOM_MONTHLY = pd.read_parquet(CACHE_DIR / "bom_monthly.parquet")
 WQ_SUMMARY = pd.read_parquet(CACHE_DIR / "water_quality_summary.parquet")
@@ -93,6 +121,24 @@ AQUIFER = {
 }
 STUDY_AREA = AQUIFER["boundary"].geometry.union_all()
 CONTOURS_PROJECTED = AQUIFER["contours"].to_crs(epsg=28353)
+
+# Precompute Ti Tree study area metrics once at startup for KPI banner & quick bore search
+_pts = gpd.GeoSeries(gpd.points_from_xy(BORES["longitude"], BORES["latitude"]), crs="EPSG:4326")
+_sa_mask = _pts.intersects(STUDY_AREA)
+STUDY_AREA_BORE_IDS = sorted(BORES.loc[_sa_mask, "bore_no"].dropna().unique().tolist())
+_sa_bores_set = set(STUDY_AREA_BORE_IDS)
+_sa_wq = WQ_FULL[WQ_FULL["bore_no"].isin(_sa_bores_set)]
+_sa_mon = BORES.loc[_sa_mask & BORES["is_monitoring_location"]]
+_sa_mon_active = _sa_mon[_sa_mon["monitor_active"] == "Current"] if "monitor_active" in _sa_mon.columns else _sa_mon
+
+STUDY_AREA_METRICS = {
+    "bores": len(STUDY_AREA_BORE_IDS),
+    "quality_bores": int(_sa_wq["bore_no"].nunique()),
+    "quality_samples": int(len(_sa_wq)),
+    "monitoring_bores": int(len(_sa_mon)),
+    "active_monitoring_bores": int(len(_sa_mon_active)),
+    "bore_ids": STUDY_AREA_BORE_IDS,
+}
 
 print(f"Loaded caches: {len(BORES):,} bores, {len(GAUGES)} gauges, {len(BOM_STATIONS)} "
       f"BOM stations in {time.time() - START_TIME:.2f}s.")
@@ -229,11 +275,13 @@ def api_meta():
             "bores_with_water_level": int(BORES["has_water_level"].sum()),
             "bores_claiming_water_level": int(BORES["water_level_claimed"].sum()),
             "bores_with_water_quality": int(BORES["has_water_quality"].sum()),
+            "water_quality_samples": len(WQ_FULL),
             "monitoring_bores": int(BORES["is_monitoring_location"].sum()),
             "river_stream_gauges": len(GAUGES),
             "bom_stations": len(BOM_STATIONS),
             "bom_stations_nt": int(BOM_STATIONS["is_nt"].sum()),
         },
+        "study_area": STUDY_AREA_METRICS,
         "measurements": MEASUREMENTS,
         "constants": CONSTANTS,
         "status_options": sorted(BORES["status"].dropna().unique().tolist()),
@@ -452,10 +500,21 @@ def api_water_quality_series(bore_id: str, parameter: str = Query(...)):
         raise HTTPException(400, f"Unknown parameter {parameter}. Use one of {columns}.")
     rows = WQ_FULL[WQ_FULL["bore_no"] == bore_id][["sample_date", parameter]].dropna()
     rows = rows.sort_values("sample_date")
+    vals = rows[parameter].astype(float)
+    stats = None
+    if not vals.empty:
+        stats = {
+            "min": round(float(vals.min()), 2),
+            "max": round(float(vals.max()), 2),
+            "mean": round(float(vals.mean()), 2),
+            "median": round(float(vals.median()), 2),
+            "count": int(len(vals)),
+        }
     return {
         "bore_no": bore_id, "parameter": parameter,
         "dates": rows["sample_date"].dt.strftime("%Y-%m-%d").tolist(),
-        "values": rows[parameter].astype(float).tolist(),
+        "values": vals.tolist(),
+        "statistics": stats,
     }
 
 
@@ -483,10 +542,22 @@ def api_water_level_series(
         if not path.exists():
             raise HTTPException(404, f"No water-level series for {bore_id}")
     table = pd.read_parquet(path)
+    valid_vals = [float(v) for v in table["value"] if pd.notna(v)]
+    stats = None
+    if valid_vals:
+        s = pd.Series(valid_vals, dtype=float)
+        stats = {
+            "min": round(float(s.min()), 2),
+            "max": round(float(s.max()), 2),
+            "mean": round(float(s.mean()), 2),
+            "median": round(float(s.median()), 2),
+            "count": int(len(s)),
+        }
     return {
         "bore_no": bore_id, "kind": safe_kind, "series": safe_series,
         "months": table["month"].tolist(),
         "values": [None if pd.isna(v) else float(v) for v in table["value"]],
+        "statistics": stats,
     }
 
 
@@ -711,6 +782,269 @@ def api_climate_wetter_drier(location: str = Query(...)):
             f"{min(distances):.0f}-{max(distances):.0f} km from {location}."
             if distances else ""
         ),
+        "credit": cm.CREDIT_TEXT,
+    }
+
+
+# ---------------------------------------------------------------------------
+# SEASONAL RECHARGE, LAG CORRELATIONS & MULTI-SERIES COMPARISON
+# ---------------------------------------------------------------------------
+
+@app.get("/api/climate/seasonal")
+def api_climate_seasonal(
+    location: str = Query("Ti Tree"),
+    station: str = Query(None),
+    runs: str = Query(None),
+    to_2099: bool = Query(False),
+):
+    if location not in cm.LOCATIONS:
+        raise HTTPException(400, f"Unknown location '{location}'. Must be one of {cm.LOCATIONS}")
+
+    start_year = 1987
+    end_year = 2099 if to_2099 else 2025
+
+    # 1. Observed seasonal totals (seasonal_totals_observed)
+    observed_data = None
+    observed_df = None
+    target_station = station if station else (cm.TI_TREE_STATION if location == "Ti Tree" else None)
+    if target_station:
+        try:
+            observed_df = cm.seasonal_totals_observed(station=target_station)
+            part = observed_df[(observed_df.index >= start_year) & (observed_df.index <= end_year)]
+            observed_data = {
+                "station": target_station,
+                "years": part.index.tolist(),
+                "wet": [None if pd.isna(v) else round(float(v), 1) for v in part["wet"]],
+                "wet_missing": [int(v) for v in part["wet_missing"]],
+                "dry": [None if pd.isna(v) else round(float(v), 1) for v in part["dry"]],
+                "dry_missing": [int(v) for v in part["dry_missing"]],
+            }
+        except FileNotFoundError:
+            observed_data = None
+        except Exception as exc:
+            raise HTTPException(400, f"Could not load observed seasonal totals: {exc}")
+
+    # 2. Model seasonal totals (seasonal_totals_model)
+    available = cm.available_runs(location)
+    if runs:
+        selected_runs = [r.strip() for r in runs.split(",") if r.strip() and r.strip() in available]
+    else:
+        preferred = ["ACCESS-ESM1-5 r6 (v2105)", "GFDL-ESM4", "NorESM2-MM"]
+        selected_runs = [r for r in preferred if r in available]
+        if not selected_runs:
+            selected_runs = available[:3]
+
+    model_tables = {}
+    models_data = {}
+    for r in selected_runs:
+        try:
+            m_df = cm.seasonal_totals_model(r, location=location)
+            model_tables[r] = m_df
+            part = m_df[(m_df.index >= start_year) & (m_df.index <= end_year)]
+            models_data[r] = {
+                "years": part.index.tolist(),
+                "wet": [None if pd.isna(v) else round(float(v), 1) for v in part["wet"]],
+                "dry": [None if pd.isna(v) else round(float(v), 1) for v in part["dry"]],
+            }
+        except Exception as exc:
+            print(f"Warning: could not load model {r}: {exc}", file=sys.stderr)
+
+    # 3. Server-generated figure using plot_seasonal where available
+    figure_dict = None
+    if observed_df is not None and model_tables:
+        try:
+            fig = cm.plot_seasonal(observed_df, model_tables, location=location,
+                                   start_year=start_year, end_year=end_year)
+            figure_dict = json.loads(fig.to_json())
+        except Exception:
+            figure_dict = None
+
+    footnote = (
+        "Outlined bars are seasons with at least one missing month in the gauge record. "
+        if observed_data else
+        f"No local observed BOM daily rainfall record available for {location}; showing climate model projections only. "
+    )
+    if to_2099:
+        footnote += "Projections shown out to 2099."
+
+    return {
+        "location": location,
+        "station": target_station,
+        "start_year": start_year,
+        "end_year": end_year,
+        "observed": observed_data,
+        "models": models_data,
+        "available_runs": available,
+        "selected_runs": selected_runs,
+        "figure": figure_dict,
+        "title": f"{location}: wet season (Nov-Apr) and dry season (May-Oct) rainfall",
+        "subtitle": "Observed rainfall vs CMIP6 model projections. Seasons are labelled by their start year.",
+        "footnote": footnote,
+        "credit": cm.CREDIT_TEXT,
+    }
+
+
+@app.get("/api/climate/lag")
+def api_climate_lag(
+    bore_id: str = Query(None),
+    driver: str = Query("rainfall"),
+    max_lag: int = Query(cm.MAX_LAG_MONTHS),
+):
+    driver_norm = driver.strip().lower()
+    if driver_norm in ("rainfall", "rain"):
+        try:
+            source = cm.rainfall_residual_mass()
+        except Exception as exc:
+            raise HTTPException(400, f"Could not load rainfall series: {exc}")
+        driver_label = "Rainfall"
+    elif driver_norm in ("flow", "river_flow", "streamflow"):
+        try:
+            source = cm.flow_residual_mass()
+        except Exception as exc:
+            raise HTTPException(400, f"Could not load river flow series: {exc}")
+        driver_label = "River flow"
+    else:
+        raise HTTPException(400, f"Unknown driver '{driver}'. Use 'rainfall' or 'flow'.")
+
+    chosen, _ = cm.choose_bores(limit=10)
+    qualifying_bores = chosen["bore"].tolist() if not chosen.empty else []
+
+    target_bore = bore_id if bore_id else (qualifying_bores[0] if qualifying_bores else None)
+    if not target_bore:
+        raise HTTPException(404, "No bore with water-level series available.")
+
+    try:
+        levels = cm.bore_monthly_level(target_bore)
+        if levels.dropna().empty:
+            raise ValueError(f"Bore {target_bore} has no recorded monthly levels.")
+    except Exception as exc:
+        raise HTTPException(404, f"Could not load water levels for bore {target_bore}: {exc}")
+
+    driver_anomaly = cm.monthly_anomaly(source)
+    response_change = cm.level_change(levels)
+    results = cm.lag_correlations(driver_anomaly, response_change, max_lag=max_lag)
+
+    # Calculate best lag and note
+    usable = results.dropna(subset=["r"])
+    reliable = usable[usable["n_months"] >= cm.MIN_PAIRED_MONTHS]
+    best = (reliable.loc[reliable["r"].abs().idxmax()] if not reliable.empty else None)
+
+    title = f"{target_bore} water-level change vs {driver_label.lower()} anomaly"
+    subtitle = f"Monthly {driver_label.lower()} anomaly leading the month-to-month change in bore level."
+
+    figure_dict = None
+    try:
+        fig = cm.plot_lag_correlation(results, title, subtitle)
+        figure_dict = json.loads(fig.to_json())
+    except Exception:
+        figure_dict = None
+
+    thin = results[results["n_months"] < cm.MIN_PAIRED_MONTHS]["lag_months"].tolist()
+    note = (
+        "Correlation is not causation; the bore series are short and gappy, so these "
+        "numbers are a hint about timing, not proof. Paired months per lag: "
+        f"{int(results['n_months'].min())}-{int(results['n_months'].max())}."
+    )
+    if thin:
+        note += (
+            f" Lags {', '.join(str(int(l)) for l in thin)} rest on fewer than "
+            f"{cm.MIN_PAIRED_MONTHS} paired months and are not treated as findings."
+        )
+    if best is None:
+        note += (
+            f" No lag reaches {cm.MIN_PAIRED_MONTHS} paired months, so no strongest lag is marked."
+        )
+
+    return {
+        "bore_id": target_bore,
+        "driver": driver_label,
+        "available_bores": qualifying_bores,
+        "max_lag": max_lag,
+        "min_paired_months": cm.MIN_PAIRED_MONTHS,
+        "lags": results["lag_months"].tolist(),
+        "r": [None if pd.isna(v) else round(float(v), 3) for v in results["r"]],
+        "n_months": [int(v) for v in results["n_months"]],
+        "best_lag": int(best["lag_months"]) if best is not None else None,
+        "best_r": round(float(best["r"]), 3) if best is not None else None,
+        "best_n": int(best["n_months"]) if best is not None else None,
+        "figure": figure_dict,
+        "title": title,
+        "subtitle": subtitle,
+        "footnote": note,
+        "credit": cm.CREDIT_TEXT,
+        "wetter_color": cm.COLOUR_WETTER,
+        "drier_color": cm.COLOUR_DRIER,
+    }
+
+
+@app.get("/api/climate/rain-flow-bores")
+def api_climate_rain_flow_bores(
+    start: str = Query("2010-01"),
+    bores: str = Query(None),
+):
+    try:
+        rain = cm.rainfall_residual_mass()
+        flow = cm.flow_residual_mass()
+    except Exception as exc:
+        raise HTTPException(400, f"Could not load rainfall or flow residual mass: {exc}")
+
+    chosen, _ = cm.choose_bores(limit=3)
+    if bores:
+        requested = [b.strip() for b in bores.split(",") if b.strip()]
+    else:
+        requested = chosen["bore"].tolist() if not chosen.empty else []
+
+    levels = {}
+    for b in requested:
+        try:
+            lvl = cm.bore_monthly_level(b)
+            if not lvl.dropna().empty:
+                levels[b] = lvl
+        except Exception:
+            pass
+
+    if not levels:
+        raise HTTPException(404, "No bore water-level series available for plotting.")
+
+    caption = (
+        f"Bores {', '.join(levels.keys())}. Rain station {cm.TI_TREE_STATION} is about 34 km from "
+        f"gauge {cm.FLOW_STATION}. Gaps in the bore lines are left open."
+    )
+
+    figure_dict = None
+    try:
+        fig = cm.plot_rain_flow_bores(rain, flow, levels, start=start, caption=caption)
+        figure_dict = json.loads(fig.to_json())
+    except Exception as exc:
+        raise HTTPException(400, f"Could not build the multi-panel plot: {exc}")
+
+    # Build CSV export rows
+    r_part = rain[rain.index >= start]
+    f_part = flow[flow.index >= start]
+    all_months = sorted(set(r_part.index) | set(f_part.index))
+    for b, s in levels.items():
+        all_months = sorted(set(all_months) | set(s[s.index >= start].index))
+
+    rows = []
+    r_cum = r_part["residual"].cumsum()
+    f_cum = f_part["residual"].cumsum()
+    for m in all_months:
+        row = {"month": m}
+        row["rainfall_total_mm"] = round(float(r_part.loc[m, "total"]), 2) if (m in r_part.index and pd.notna(r_part.loc[m, "total"])) else None
+        row["rainfall_cum_residual_mm"] = round(float(r_cum.loc[m]), 2) if (m in r_cum.index and pd.notna(r_cum.loc[m])) else None
+        row["flow_total_ML"] = round(float(f_part.loc[m, "total"]), 2) if (m in f_part.index and pd.notna(f_part.loc[m, "total"])) else None
+        row["flow_cum_residual_ML"] = round(float(f_cum.loc[m]), 2) if (m in f_cum.index and pd.notna(f_cum.loc[m])) else None
+        for b, s in levels.items():
+            row[f"water_level_{b}_m_AHD"] = round(float(s.loc[m]), 3) if (m in s.index and pd.notna(s.loc[m])) else None
+        rows.append(row)
+
+    return {
+        "start": start,
+        "bores": list(levels.keys()),
+        "available_bores": chosen["bore"].tolist() if not chosen.empty else list(levels.keys()),
+        "caption": caption,
+        "figure": figure_dict,
+        "rows": rows,
         "credit": cm.CREDIT_TEXT,
     }
 

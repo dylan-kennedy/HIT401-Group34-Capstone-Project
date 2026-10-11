@@ -1,0 +1,13 @@
+# Packages needed by the web application (webapp/)
+fastapi
+uvicorn
+pandas
+numpy
+geopandas
+pyogrio
+shapely
+pyarrow
+xarray
+netCDF4
+httpx
+plotly

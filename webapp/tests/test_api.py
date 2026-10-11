@@ -213,6 +213,143 @@ def test_climate_unknown_location_is_400_not_500():
     assert resp.status_code == 400
 
 
+def test_climate_seasonal_ti_tree_has_observed_and_models():
+    resp = client.get("/api/climate/seasonal", params={"location": "Ti Tree"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["observed"] is not None
+    assert len(data["observed"]["years"]) > 0
+    assert len(data["observed"]["wet"]) == len(data["observed"]["years"])
+    assert len(data["models"]) > 0
+    assert data["figure"] is not None
+
+
+def test_climate_seasonal_darwin_handles_missing_observed():
+    resp = client.get("/api/climate/seasonal", params={"location": "Darwin"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["observed"] is None
+    assert len(data["models"]) > 0
+
+
+def test_climate_lag_rainfall_returns_correlations():
+    resp = client.get("/api/climate/lag", params={"driver": "rainfall"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["driver"] == "Rainfall"
+    assert len(data["lags"]) == data["max_lag"] + 1
+    assert len(data["r"]) == len(data["lags"])
+    assert data["figure"] is not None
+
+
+def test_climate_lag_flow_returns_correlations():
+    resp = client.get("/api/climate/lag", params={"driver": "flow"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["driver"] == "River flow"
+    assert len(data["lags"]) == data["max_lag"] + 1
+
+
+def test_climate_lag_unknown_driver_is_400():
+    resp = client.get("/api/climate/lag", params={"driver": "invalid_driver"})
+    assert resp.status_code == 400
+
+
+def test_climate_lag_unknown_bore_is_404():
+    resp = client.get("/api/climate/lag", params={"bore_id": "RN9999999"})
+    assert resp.status_code == 404
+
+
+def test_climate_rain_flow_bores_returns_figure_and_rows():
+    resp = client.get("/api/climate/rain-flow-bores", params={"start": "2010-01"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["bores"]) > 0
+    assert data["figure"] is not None
+    assert len(data["rows"]) > 0
+    assert "month" in data["rows"][0]
+    assert "rainfall_total_mm" in data["rows"][0]
+    assert "flow_total_ML" in data["rows"][0]
+
+
+# ---------------------------------------------------------
+# Legacy App Features: KPI banner and statistics calculations
+# ---------------------------------------------------------
+
+def test_meta_contains_study_area_and_wq_samples():
+    data = client.get("/api/meta").json()
+    assert "study_area" in data
+    sa = data["study_area"]
+    assert sa["bores"] == 415
+    assert sa["quality_bores"] == 272
+    assert sa["quality_samples"] == 1185
+    assert sa["monitoring_bores"] == 126
+    assert sa["active_monitoring_bores"] == 36
+    assert len(sa["bore_ids"]) == 415
+    assert "RN006543" in sa["bore_ids"]
+    assert data["counts"]["water_quality_samples"] == 84769
+
+
+def test_water_quality_series_returns_statistics_card_data():
+    resp = client.get("/api/water-quality/RN006543", params={"parameter": "TDS"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "statistics" in data
+    stats = data["statistics"]
+    assert stats is not None
+    assert "min" in stats and "max" in stats and "mean" in stats and "median" in stats and "count" in stats
+    assert stats["count"] == len(data["values"])
+    assert stats["min"] <= stats["median"] <= stats["max"]
+    assert stats["min"] <= stats["mean"] <= stats["max"]
+
+
+def test_water_level_series_returns_statistics_card_data():
+    resp = client.get("/api/water-level/RN006543")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "statistics" in data
+    stats = data["statistics"]
+    assert stats is not None
+    assert "min" in stats and "max" in stats and "mean" in stats and "median" in stats and "count" in stats
+    assert stats["min"] <= stats["median"] <= stats["max"]
+
+
+# ---------------------------------------------------------
+# Water Data Portal URL tests
+# ---------------------------------------------------------
+
+def test_bore_detail_portal_urls_use_aquaticinformatics():
+    resp = client.get("/api/location/bore/RN006543")
+    assert resp.status_code == 200
+    ov = resp.json()["overview"]
+    for field in ("water_data_portal", "water_data_portal_shp", "monitor_portal_url"):
+        val = ov.get(field)
+        if val:
+            assert "water.nt.gov.au" not in val, f"{field} still contains water.nt.gov.au: {val}"
+            assert val.startswith("https://ntg.aquaticinformatics.net/"), f"{field} does not start with new host: {val}"
+    # Bore report URL must remain on ntlis.nt.gov.au
+    assert "ntlis.nt.gov.au" in ov["bore_report_url"]
+
+
+def test_monitoring_only_bore_portal_url_uses_aquaticinformatics():
+    # RN003532 only has monitoring portal URL
+    resp = client.get("/api/location/bore/RN003532")
+    assert resp.status_code == 200
+    ov = resp.json()["overview"]
+    assert ov.get("monitor_portal_url") is not None
+    assert "water.nt.gov.au" not in ov["monitor_portal_url"]
+    assert ov["monitor_portal_url"].startswith("https://ntg.aquaticinformatics.net/")
+
+
+def test_gauge_detail_portal_url_uses_aquaticinformatics():
+    resp = client.get("/api/location/gauge/G0280010")
+    assert resp.status_code == 200
+    ov = resp.json()["overview"]
+    assert ov.get("water_data_portal") is not None
+    assert "water.nt.gov.au" not in ov["water_data_portal"]
+    assert ov["water_data_portal"].startswith("https://ntg.aquaticinformatics.net/")
+
+
 # ---------------------------------------------------------
 # static page
 # ---------------------------------------------------------

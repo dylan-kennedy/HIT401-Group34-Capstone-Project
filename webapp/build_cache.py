@@ -41,6 +41,7 @@ import sys
 import time
 import zipfile
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 
 import pandas as pd
 
@@ -107,6 +108,29 @@ def normalise_id(value):
         digits = "".join(c for c in text[2:] if c.isdigit())
         if digits:
             return f"RN{int(digits):06d}"
+    return text
+
+
+def fix_water_data_portal_url(value):
+    """Upgrades legacy NT Water Data Portal URLs from the decommissioned
+    water.nt.gov.au host to the official ntg.aquaticinformatics.net host.
+
+    Preserves full path (e.g. /Data/Location/Summary/Location/<ID>/...), query
+    parameters and fragments. Unrelated domains (e.g. ntlis.nt.gov.au bore reports)
+    and already-correct URLs are untouched. Missing/empty values remain None."""
+    if value is None or pd.isna(value):
+        return None
+    text = str(value).strip().strip('"')
+    if not text or not text.startswith("http"):
+        return None
+    try:
+        parsed = urlparse(text)
+    except Exception:
+        return text
+
+    if parsed.netloc.lower() == "water.nt.gov.au":
+        new_parsed = parsed._replace(scheme="https", netloc="ntg.aquaticinformatics.net")
+        return urlunparse(new_parsed)
     return text
 
 
@@ -199,6 +223,7 @@ def load_bores_csv():
                 "water_data_portal", "bore_report_url"):
         frame[col] = frame[col].astype("string").str.strip()
         frame.loc[frame[col] == "", col] = pd.NA
+    frame["water_data_portal"] = frame["water_data_portal"].map(fix_water_data_portal_url)
 
     before = len(frame)
     frame = frame.dropna(subset=["latitude", "longitude"])
@@ -276,6 +301,7 @@ def load_bores_shapefile():
                 "order, i.e. the shapefile's own record order); later duplicates discarded.",
     }
     frame = frame.drop_duplicates("bore_no", keep="first")
+    frame["WATER_DATA"] = frame["WATER_DATA"].map(fix_water_data_portal_url)
     return frame[["bore_no", "WATERLEVEL", "RISK_CLASS", "WATER_DATA", "MONITORED",
                   "STATUSCONS", "shp_lat", "shp_lon"]].rename(columns={
         "WATERLEVEL": "waterlevel_m", "RISK_CLASS": "risk_class",
@@ -302,6 +328,7 @@ def load_monitoring_layer():
     frame["lon"] = frame.geometry.x
     frame["commence"] = pd.to_datetime(frame["COMMENCE"], errors="coerce")
     frame["cease"] = pd.to_datetime(frame["CEASE"], errors="coerce")
+    frame["WATER_DATA"] = frame["WATER_DATA"].map(fix_water_data_portal_url)
     frame = frame.dropna(subset=["station_id"]).drop_duplicates("station_id", keep="first")
 
     is_bore = frame["station_id"].str.startswith("RN")
