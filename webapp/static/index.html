@@ -132,7 +132,10 @@
         </section>
 
         <section class="panel-section">
-          <h3>Filters</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0;">Filters</h3>
+            <button id="btn-clear-filters" type="button" class="btn-subtle" style="font-size: 11.5px; padding: 2px 8px; cursor: pointer;" title="Clear selected Status and Purpose filters">Clear filters</button>
+          </div>
           <label for="filter-status">Status</label>
           <select id="filter-status" multiple size="4"></select>
           <label for="filter-purpose">Purpose</label>

@@ -906,6 +906,21 @@ function initSidebar() {
   document.getElementById("filter-status").addEventListener("change", renderMarkers);
   document.getElementById("filter-purpose").addEventListener("change", renderMarkers);
 
+  const clearFiltersBtn = document.getElementById("btn-clear-filters");
+  if (clearFiltersBtn) {
+    clearFiltersBtn.addEventListener("click", () => {
+      const statusSelect = document.getElementById("filter-status");
+      const purposeSelect = document.getElementById("filter-purpose");
+      if (statusSelect) {
+        Array.from(statusSelect.options).forEach((opt) => { opt.selected = false; });
+      }
+      if (purposeSelect) {
+        Array.from(purposeSelect.options).forEach((opt) => { opt.selected = false; });
+      }
+      renderMarkers();
+    });
+  }
+
   const colourSelect = document.getElementById("colour-by");
   colourSelect.addEventListener("change", async (e) => {
     state.colourBy = e.target.value;
