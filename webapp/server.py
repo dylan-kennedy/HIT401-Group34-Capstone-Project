@@ -31,8 +31,13 @@ REPO_ROOT = WEBAPP_DIR.parent
 CACHE_DIR = WEBAPP_DIR / "cache"
 STATIC_DIR = WEBAPP_DIR / "static"
 
+sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "climate"))
-import climate_models as cm  # noqa: E402
+
+try:
+    from climate import climate_models as cm  # noqa: E402
+except ImportError:
+    import climate_models as cm  # noqa: E402
 
 START_TIME = time.time()
 
