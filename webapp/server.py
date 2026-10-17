@@ -655,8 +655,16 @@ def api_about():
     citations_path = REPO_ROOT / "docs" / "climate" / "CITATIONS_CMIP6.md"
     notes_path = REPO_ROOT / "docs" / "climate" / "climate_data_notes.md"
     return {
-        "citations_markdown": citations_path.read_text() if citations_path.exists() else None,
-        "data_notes_markdown": notes_path.read_text() if notes_path.exists() else None,
+        "citations_markdown": (
+            citations_path.read_text(encoding="utf-8", errors="replace")
+            if citations_path.exists()
+            else None
+        ),
+        "data_notes_markdown": (
+            notes_path.read_text(encoding="utf-8", errors="replace")
+            if notes_path.exists()
+            else None
+        ),
         "sources": [
             "NT Natural Resource Maps — Bores.csv and bore shapefiles (Dr Cat Kutay / "
             "A/Prof Dylan Irvine, supplied by email; also at nrmaps.nt.gov.au)",

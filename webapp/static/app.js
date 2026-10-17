@@ -1852,25 +1852,39 @@ function setView(view) {
 }
 
 function initAbout() {
+  const panel = document.getElementById("about-panel");
+  const closeBtn = document.getElementById("about-close");
+  const closeAbout = () => panel.classList.add("hidden");
+
   document.getElementById("btn-about").addEventListener("click", async () => {
-    const panel = document.getElementById("about-panel");
     panel.classList.remove("hidden");
     const body = document.getElementById("about-body");
     body.innerHTML = "Loading…";
-    const data = await fetchJSON("/api/about");
-    body.innerHTML = "";
-    body.appendChild(el("h2", {}, "About this explorer"));
-    body.appendChild(el("h3", {}, "Data sources"));
-    const sourceList = el("ul", {}, data.sources.map((s) => el("li", {}, s)));
-    body.appendChild(sourceList);
-    body.appendChild(el("h3", {}, "Limitations"));
-    body.appendChild(el("ul", {}, data.limitations.map((s) => el("li", {}, s))));
-    if (data.citations_markdown) {
-      body.appendChild(el("h3", {}, "CMIP6 citations and licences (full text)"));
-      body.appendChild(el("pre", { style: "white-space:pre-wrap;font-size:11.5px;" }, data.citations_markdown));
+    try {
+      const data = await fetchJSON("/api/about");
+      body.innerHTML = "";
+      body.appendChild(el("h2", {}, "About this explorer"));
+      body.appendChild(el("h3", {}, "Data sources"));
+      const sourceList = el("ul", {}, data.sources.map((s) => el("li", {}, s)));
+      body.appendChild(sourceList);
+      body.appendChild(el("h3", {}, "Limitations"));
+      body.appendChild(el("ul", {}, data.limitations.map((s) => el("li", {}, s))));
+      if (data.citations_markdown) {
+        body.appendChild(el("h3", {}, "CMIP6 citations and licences (full text)"));
+        body.appendChild(el("pre", { style: "white-space:pre-wrap;font-size:11.5px;max-height:300px;overflow-y:auto;background:var(--surface-2);padding:10px;border-radius:6px;border:1px solid var(--border);" }, data.citations_markdown));
+      }
+    } catch (err) {
+      body.innerHTML = `<p class="empty-state">Could not load details: ${err.message}</p>`;
     }
   });
-  document.getElementById("about-close").addEventListener("click", () => document.getElementById("about-panel").classList.add("hidden"));
+
+  closeBtn.addEventListener("click", closeAbout);
+  panel.addEventListener("click", (e) => {
+    if (e.target === panel) closeAbout();
+  });
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !panel.classList.contains("hidden")) closeAbout();
+  });
 }
 
 // ---------------------------------------------------------------------------
