@@ -433,6 +433,17 @@ function initSplitter() {
   const downloadBtn = document.getElementById("btn-panel-download");
   if (downloadBtn) downloadBtn.addEventListener("click", exportActiveLocationCSV);
 
+  const printBtn = document.getElementById("btn-panel-print");
+  if (printBtn) {
+    printBtn.addEventListener("click", () => {
+      if (state.panelMode === "empty") {
+        alert("Please select a bore on the map first to print its report card.");
+        return;
+      }
+      window.print();
+    });
+  }
+
   let resizeTimer = null;
   window.addEventListener("resize", () => {
     clearTimeout(resizeTimer);
