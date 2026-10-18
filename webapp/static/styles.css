@@ -500,3 +500,124 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
   #search-wrap { max-width: none; }
   #place-summary { left: 8px; right: 8px; max-width: none; }
 }
+
+/* ---------------- Print styles: format clean Groundwater Report Card ---------------- */
+@media print {
+  @page {
+    margin: 1.2cm;
+    size: auto;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+    overflow: visible !important;
+  }
+
+  /* Hide interactive navigation and map chrome */
+  #topbar,
+  #sidebar,
+  #splitter,
+  #map,
+  #kpi-banner,
+  #panel-toolbar,
+  #drawer-tabs,
+  #drawer-close,
+  #about-panel,
+  #place-summary,
+  #btn-exit-map-expand,
+  .chart-actions,
+  #loading-indicator {
+    display: none !important;
+  }
+
+  #main,
+  #map-view,
+  #map-drawer-wrap {
+    display: block !important;
+    height: auto !important;
+    width: 100% !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  #drawer {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    position: static !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  #drawer-sticky-head {
+    position: static !important;
+    border: none !important;
+  }
+
+  #drawer-header {
+    border-bottom: 2px solid #0067a3 !important;
+    padding: 0 0 10px 0 !important;
+    margin-bottom: 15px !important;
+  }
+
+  #drawer-header::before {
+    content: "HIT401 Capstone Project — Northern Territory Groundwater Report Card";
+    display: block;
+    font-size: 10pt;
+    font-weight: 700;
+    color: #0067a3;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  #drawer-title {
+    font-size: 18pt !important;
+    color: #111111 !important;
+  }
+
+  #drawer-subtitle {
+    font-size: 11pt !important;
+    color: #444444 !important;
+  }
+
+  #drawer-body {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .field-row,
+  .checklist-row {
+    border-bottom: 1px solid #e0e0e0 !important;
+    padding: 4px 0 !important;
+    page-break-inside: avoid;
+  }
+
+  .stats-card,
+  .stats-grid {
+    page-break-inside: avoid;
+    border: 1px solid #cccccc !important;
+    background: #fdfdfd !important;
+  }
+
+  .chart {
+    height: 320px !important;
+    max-height: 340px !important;
+    page-break-inside: avoid;
+  }
+
+  #drawer-body::after {
+    content: "HIT401 Group 34 Capstone Project · Charles Darwin University (CDU) · Data: NT Water Data Portal, BOM, NRM.";
+    display: block;
+    margin-top: 25px;
+    font-size: 9pt;
+    color: #666666;
+    border-top: 1px solid #cccccc;
+    padding-top: 6px;
+    text-align: center;
+  }
+}

@@ -3,6 +3,8 @@ gwrc_tidy.csv
 gwrc_trend_results.csv
 *.png
 
+
+.venv
 # Local environment
 .venv_verify/
 __pycache__/

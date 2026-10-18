@@ -132,7 +132,10 @@
         </section>
 
         <section class="panel-section">
-          <h3>Filters</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0;">Filters</h3>
+            <button id="btn-clear-filters" type="button" class="btn-subtle" style="font-size: 11.5px; padding: 2px 8px; cursor: pointer;" title="Clear selected Status and Purpose filters">Clear filters</button>
+          </div>
           <label for="filter-status">Status</label>
           <select id="filter-status" multiple size="4"></select>
           <label for="filter-purpose">Purpose</label>
@@ -181,6 +184,8 @@
              minimum width (~320px); full wording is in each button's title/aria-label. -->
         <div id="panel-toolbar">
           <div id="panel-toolbar-actions">
+            <button id="btn-panel-download" class="icon-btn" type="button" title="Download data (CSV) for this location" aria-label="Download data (CSV)">📥 CSV</button>
+            <button id="btn-panel-print" class="icon-btn" type="button" title="Print or save as PDF report card" aria-label="Print or save as PDF">🖨️ Print</button>
             <button id="btn-reset-layout" class="icon-btn" type="button" title="Reset panel size to the default" aria-label="Reset panel size to the default">Reset</button>
             <button id="btn-panel-expand" class="icon-btn" type="button" title="Expand panel to full width" aria-label="Expand panel to full width" aria-pressed="false">⛶ Panel</button>
             <button id="btn-map-expand" class="icon-btn" type="button" title="Expand map to full width" aria-label="Expand map to full width" aria-pressed="false">⛶ Map</button>

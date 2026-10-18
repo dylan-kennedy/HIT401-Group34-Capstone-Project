@@ -215,6 +215,162 @@ function setLayoutMode(mode) {
   }, 60);
 }
 
+async function exportActiveLocationCSV() {
+  if (state.panelMode === "compare") {
+    const btnCompareDownload = document.getElementById("btn-compare-download-all");
+    if (btnCompareDownload) {
+      btnCompareDownload.click();
+      return;
+    }
+  }
+
+  if (state.panelMode === "empty" || !state.selected || !state.currentDetail) {
+    alert("Please select a bore on the map first to export its data.");
+    return;
+  }
+
+  const { type, id } = state.selected;
+  const detail = state.currentDetail;
+  const rows = [];
+  showLoading(true);
+
+  try {
+    if (type === "bore") {
+      const overview = detail.overview || {};
+      // 1. Overview metadata
+      Object.entries(overview).forEach(([k, v]) => {
+        if (v !== null && v !== undefined && v !== "" && typeof v !== "object") {
+          rows.push({
+            location_id: id,
+            location_type: "Bore",
+            location_name: overview.name || "",
+            dataset: "Overview",
+            record_date: overview.completion_date || "",
+            parameter: k,
+            value: v,
+            unit: "",
+          });
+        }
+      });
+
+      // 2. Water level series if available
+      if (detail.data_available && detail.data_available.water_level && detail.water_level_series_available) {
+        for (const s of detail.water_level_series_available) {
+          try {
+            const data = await fetchJSON(`/api/water-level/${id}`, { kind: s.kind, series: s.series });
+            if (data && data.months && data.values) {
+              const unit = String(s.kind).toLowerCase().includes("depth") ? "m below ground" : "m AHD";
+              for (let i = 0; i < data.months.length; i++) {
+                if (data.values[i] !== null && data.values[i] !== undefined) {
+                  rows.push({
+                    location_id: id,
+                    location_type: "Bore",
+                    location_name: overview.name || "",
+                    dataset: "Water Level",
+                    record_date: data.months[i],
+                    parameter: `${s.kind} (${s.series})`,
+                    value: data.values[i],
+                    unit: unit,
+                  });
+                }
+              }
+            }
+          } catch (e) { /* skip unreadable series */ }
+        }
+      }
+
+      // 3. Water quality samples if available
+      if (detail.data_available && detail.data_available.water_quality && detail.water_quality_summary) {
+        for (const wq of detail.water_quality_summary) {
+          try {
+            const data = await fetchJSON(`/api/water-quality/${id}`, { parameter: wq.parameter });
+            if (data && data.dates && data.values) {
+              for (let i = 0; i < data.dates.length; i++) {
+                if (data.values[i] !== null && data.values[i] !== undefined) {
+                  rows.push({
+                    location_id: id,
+                    location_type: "Bore",
+                    location_name: overview.name || "",
+                    dataset: "Water Quality",
+                    record_date: data.dates[i],
+                    parameter: wq.parameter,
+                    value: data.values[i],
+                    unit: "",
+                  });
+                }
+              }
+            }
+          } catch (e) { /* skip */ }
+        }
+      }
+
+      if (rows.length) {
+        downloadCSV(`${id}_complete_data.csv`, rows);
+      } else {
+        alert(`No data records available to download for ${id}.`);
+      }
+    } else if (type === "river_stream_gauge") {
+      const overview = detail.overview || {};
+      try {
+        const data = await fetchJSON("/api/flow");
+        if (data && data.months) {
+          data.months.forEach((m, i) => {
+            rows.push({
+              location_id: id,
+              location_type: "River Gauge",
+              location_name: overview.name || "",
+              dataset: "Streamflow",
+              record_date: m,
+              parameter: "Discharge (ML)",
+              value: data.total_ML[i],
+              unit: "ML",
+            });
+          });
+        }
+      } catch (e) {}
+      if (!rows.length) {
+        Object.entries(overview).forEach(([k, v]) => {
+          if (v !== null && v !== undefined && typeof v !== "object") {
+            rows.push({ location_id: id, location_type: "River Gauge", location_name: overview.name || "", dataset: "Overview", record_date: "", parameter: k, value: v, unit: "" });
+          }
+        });
+      }
+      downloadCSV(`${id}_streamflow_data.csv`, rows);
+    } else if (type === "bom_station") {
+      const overview = detail.overview || {};
+      try {
+        const data = await fetchJSON(`/api/rainfall/${id}`);
+        if (data && data.months) {
+          data.months.forEach((m, i) => {
+            rows.push({
+              location_id: id,
+              location_type: "BOM Station",
+              location_name: overview.name || "",
+              dataset: "Rainfall",
+              record_date: m,
+              parameter: "Monthly Total (mm)",
+              value: data.total_mm[i],
+              unit: "mm",
+            });
+          });
+        }
+      } catch (e) {}
+      if (!rows.length) {
+        Object.entries(overview).forEach(([k, v]) => {
+          if (v !== null && v !== undefined && typeof v !== "object") {
+            rows.push({ location_id: id, location_type: "BOM Station", location_name: overview.name || "", dataset: "Overview", record_date: "", parameter: k, value: v, unit: "" });
+          }
+        });
+      }
+      downloadCSV(`${id}_rainfall_data.csv`, rows);
+    }
+  } catch (err) {
+    alert(`Could not export CSV: ${err.message}`);
+  } finally {
+    showLoading(false);
+  }
+}
+
 function initSplitter() {
   const splitter = document.getElementById("splitter");
   const wrap = document.getElementById("map-drawer-wrap");
@@ -273,6 +429,20 @@ function initSplitter() {
     applyPanelWidth(PANEL_DEFAULT_PCT);
     setLayoutMode("split");
   });
+
+  const downloadBtn = document.getElementById("btn-panel-download");
+  if (downloadBtn) downloadBtn.addEventListener("click", exportActiveLocationCSV);
+
+  const printBtn = document.getElementById("btn-panel-print");
+  if (printBtn) {
+    printBtn.addEventListener("click", () => {
+      if (state.panelMode === "empty") {
+        alert("Please select a bore on the map first to print its report card.");
+        return;
+      }
+      window.print();
+    });
+  }
 
   let resizeTimer = null;
   window.addEventListener("resize", () => {
@@ -735,6 +905,21 @@ function initSidebar() {
   });
   document.getElementById("filter-status").addEventListener("change", renderMarkers);
   document.getElementById("filter-purpose").addEventListener("change", renderMarkers);
+
+  const clearFiltersBtn = document.getElementById("btn-clear-filters");
+  if (clearFiltersBtn) {
+    clearFiltersBtn.addEventListener("click", () => {
+      const statusSelect = document.getElementById("filter-status");
+      const purposeSelect = document.getElementById("filter-purpose");
+      if (statusSelect) {
+        Array.from(statusSelect.options).forEach((opt) => { opt.selected = false; });
+      }
+      if (purposeSelect) {
+        Array.from(purposeSelect.options).forEach((opt) => { opt.selected = false; });
+      }
+      renderMarkers();
+    });
+  }
 
   const colourSelect = document.getElementById("colour-by");
   colourSelect.addEventListener("change", async (e) => {
@@ -1667,25 +1852,39 @@ function setView(view) {
 }
 
 function initAbout() {
+  const panel = document.getElementById("about-panel");
+  const closeBtn = document.getElementById("about-close");
+  const closeAbout = () => panel.classList.add("hidden");
+
   document.getElementById("btn-about").addEventListener("click", async () => {
-    const panel = document.getElementById("about-panel");
     panel.classList.remove("hidden");
     const body = document.getElementById("about-body");
     body.innerHTML = "Loading…";
-    const data = await fetchJSON("/api/about");
-    body.innerHTML = "";
-    body.appendChild(el("h2", {}, "About this explorer"));
-    body.appendChild(el("h3", {}, "Data sources"));
-    const sourceList = el("ul", {}, data.sources.map((s) => el("li", {}, s)));
-    body.appendChild(sourceList);
-    body.appendChild(el("h3", {}, "Limitations"));
-    body.appendChild(el("ul", {}, data.limitations.map((s) => el("li", {}, s))));
-    if (data.citations_markdown) {
-      body.appendChild(el("h3", {}, "CMIP6 citations and licences (full text)"));
-      body.appendChild(el("pre", { style: "white-space:pre-wrap;font-size:11.5px;" }, data.citations_markdown));
+    try {
+      const data = await fetchJSON("/api/about");
+      body.innerHTML = "";
+      body.appendChild(el("h2", {}, "About this explorer"));
+      body.appendChild(el("h3", {}, "Data sources"));
+      const sourceList = el("ul", {}, data.sources.map((s) => el("li", {}, s)));
+      body.appendChild(sourceList);
+      body.appendChild(el("h3", {}, "Limitations"));
+      body.appendChild(el("ul", {}, data.limitations.map((s) => el("li", {}, s))));
+      if (data.citations_markdown) {
+        body.appendChild(el("h3", {}, "CMIP6 citations and licences (full text)"));
+        body.appendChild(el("pre", { style: "white-space:pre-wrap;font-size:11.5px;max-height:300px;overflow-y:auto;background:var(--surface-2);padding:10px;border-radius:6px;border:1px solid var(--border);" }, data.citations_markdown));
+      }
+    } catch (err) {
+      body.innerHTML = `<p class="empty-state">Could not load details: ${err.message}</p>`;
     }
   });
-  document.getElementById("about-close").addEventListener("click", () => document.getElementById("about-panel").classList.add("hidden"));
+
+  closeBtn.addEventListener("click", closeAbout);
+  panel.addEventListener("click", (e) => {
+    if (e.target === panel) closeAbout();
+  });
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !panel.classList.contains("hidden")) closeAbout();
+  });
 }
 
 // ---------------------------------------------------------------------------
