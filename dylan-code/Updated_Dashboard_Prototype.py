@@ -8,6 +8,29 @@
 ##                                                           #
 ##############################################################
 
+# Edit: Instructions have been removed from the Readme as this project was not chosen going forward. Testing instructions will be outlined below should you wish to test it still:
+
+# Unzip the 'data.zip' file manually, into the same directory (dylan-code) first.
+
+# - Install python virtual environment - #
+# python -m venv .venv
+
+# - Activate virtual environment - #
+# .\.venv\Scripts\activate.ps1      
+# Note: If you get an error that running scripts is disabled, please use the temporary bypass command, then run the above command again:
+# (Set-ExecutionPolicy RemoteSigned -Scope CurrentUser) ### It will undo once the venv is deactivated, the .venv folder is deleted, and VS Code instances are closed.
+
+# - Install dependencies - #
+# pip install -r requirements.txt
+
+# - Run the Dashboard w/ Streamlit - #
+# streamlit run Updated_Dashboard_Prototype.py (or dylan-code/Updated_Dashboard_Prototype.py)
+
+# General Operation
+# Relatively simple interactive map with dashboard modes. My contributions are detailed below (messy), but primarily the "BOM Climate Data" dashboard mode.
+# To use it, you will need to select it first, and then select an option from the drop down menu at the bottom of the Dashboard Controls panel (bottom left of the screen, may need to scroll it down)
+
+
 
 ### New Additions - Project is still in a proof of concept stage at the moment ###
 # - Added filter to select State / Territory, city / suburb could be added later if necessary but are part of search feature for now. 
